@@ -3,6 +3,8 @@ package controllers
 import (
 	"logtheus/internal/api/dto"
 	"logtheus/internal/service"
+	utils "logtheus/internal/utils"
+
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -18,26 +20,10 @@ func NewUserController(userService *service.UserService) *UserController {
 	}
 }
 
-func (c *UserController) GetUserByID(ctx *gin.Context) {
-	id := ctx.Param("id")
-
-	user, err := c.userService.GetUserByID(ctx, id)
-	if err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, user)
-}
-
 func (c *UserController) CreateUser(ctx *gin.Context) {
-	username := ctx.GetString("username")
-	email := ctx.GetString("email")
-	password := ctx.GetString("password")
+	data := utils.MustDTO[dto.RegisterRequest](ctx)
 
-	dto := dto.RegisterRequest{Email: email, Password: password, Username: username}
-
-	user, err := c.userService.CreateUser(ctx, &dto)
+	user, err := c.userService.CreateUser(ctx, &data)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
