@@ -1,41 +1,41 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
+	"logtheus/internal/api"
 	"logtheus/internal/config"
-	"logtheus/internal/constants"
+	"logtheus/internal/models"
+	"logtheus/internal/storage"
+	sl "logtheus/internal/utils/logger"
 	"os"
-	"time"
-
-	"github.com/Marlliton/slogpretty"
 )
 
 func main() {
 	cfg, err := config.LoadConfig(".env")
 	if err != nil {
-		slog.Error("Failed to load config", "error", err)
+		slog.Error("Failed to load config", sl.Error(err))
 		os.Exit(1)
 	}
 
-	logger := setupLogger(cfg.Env)
+	logger := sl.SetupLogger(cfg.Env)
 	slog.SetDefault(logger)
 
-	slog.Info("Server starting", "mode", cfg.Env, "port", cfg.Server.Port)
-}
-
-func setupLogger(env string) *slog.Logger {
-	var logger *slog.Logger
-	switch env {
-	case constants.DEVELOPMENT:
-		logger = slog.New(slogpretty.New(os.Stdout, &slogpretty.Options{
-			Level:      slog.LevelDebug,
-			TimeFormat: time.RFC3339,
-			Colorful:   true,
-		}))
-	case constants.PRODUCTION:
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		}))
+	db, err := storage.NewPostgres(cfg)
+	if err != nil {
+		slog.Error("Failed to setup database", sl.Error(err))
+		os.Exit(1)
 	}
-	return logger
+
+	db.Migrate(&models.User{})
+
+	defer db.Close()
+
+	router := api.NewRouter(db.DB)
+
+	slog.Info("Server starting", "mode", cfg.Env, "port", cfg.Server.Port)
+	if err := router.Run(fmt.Sprintf("localhost:%d", cfg.Server.Port)); err != nil {
+		slog.Error("Failed to start server", sl.Error(err))
+		os.Exit(1)
+	}
 }

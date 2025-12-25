@@ -14,6 +14,7 @@ type AppConfig struct {
 	DB struct {
 		Host     string `mapstructure:"POSTGRES_HOST"`
 		Port     int    `mapstructure:"POSTGRES_PORT"`
+		Name     string `mapstructure:"POSTGRES_DB"`
 		User     string `mapstructure:"POSTGRES_USER"`
 		Password string `mapstructure:"POSTGRES_PASSWORD"`
 	} `mapstructure:",squash"`
