@@ -7,8 +7,9 @@ import (
 )
 
 type AppConfig struct {
-	Env    string `mapstructure:"ENV"`
-	Server struct {
+	Env       string `mapstructure:"ENV"`
+	AppDomain string `mapstructure:"APP_DOMAIN"`
+	Server    struct {
 		Port int `mapstructure:"PORT"`
 	} `mapstructure:",squash"`
 	DB struct {
@@ -30,6 +31,14 @@ type AppConfig struct {
 		Host     string `mapstructure:"REDIS_HOST"`
 		Port     int    `mapstructure:"REDIS_PORT"`
 		Database int    `mapstructure:"REDIS_DATABASE"`
+	} `mapstructure:",squash"`
+
+	SMTP struct {
+		Host     string `mapstructure:"MAIL_HOST"`
+		Port     int    `mapstructure:"MAIL_PORT"`
+		Login    string `mapstructure:"MAIL_LOGIN"`
+		Password string `mapstructure:"MAIL_PASSWORD"`
+		From     string `mapstructure:"MAIL_FROM"`
 	} `mapstructure:",squash"`
 }
 

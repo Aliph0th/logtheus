@@ -55,9 +55,9 @@ func (s *TokenService) IssueToken(userID uint, tokenType consts.TokenType, ttl t
 
 func (s *TokenService) generateToken(tokenType consts.TokenType) (string, error) {
 	switch tokenType {
-	case consts.RESET_TOKEN:
+	case consts.TYPE_RESET_TOKEN:
 		return uuid.NewString(), nil
-	case consts.VERIFY_TOKEN:
+	case consts.TYPE_VERIFY_TOKEN:
 		return utils.GenerateCryptoRandomInt(consts.VERIFY_TOKEN_LENGTH)
 	default:
 		return "", fmt.Errorf("Unsupported token type for generation: %s", tokenType)

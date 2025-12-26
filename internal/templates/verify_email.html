@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Email verification</title>
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body style="background-color:#ffffff; margin:0; padding:16px; font-family: Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+      <tr>
+        <td align="center">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:465px; width:100%; border:1px solid #eaeaea; border-radius:8px; margin:40px auto;">
+            <tr>
+              <td style="padding:20px;">
+                <h1 style="color:#000000; font-size:24px; font-weight:400; text-align:center; margin:30px 0 0 0;">
+                  Verify your email to use <strong>FicReview</strong>
+                </h1>
+                <p style="color:#000000; font-size:14px; line-height:24px; margin:24px 0 0 0;">Hello, {{.Username}}!</p>
+                <p style="color:#000000; font-size:14px; line-height:24px; margin:8px 0 0 0;">
+                  Please click on the button below to verify your email
+                </p>
+                <div style="text-align:center; margin:32px 0;">
+                  <p style="color:#000000; font-size:18px; line-height:24px; font-style:italic; font-weight:600; margin:0 0 16px 0;">{{.Code}}</p>
+                  <a href="{{.Url}}" style="background-color:#000000; color:#ffffff; display:inline-block; text-decoration:none; font-size:12px; font-weight:600; padding:12px 20px; border-radius:4px;">Verify</a>
+                </div>
+                <hr style="border:none; border-top:1px solid #eaeaea; margin:26px 0 0 0;" />
+                <p style="color:#666666; font-size:12px; line-height:24px; margin:16px 0 0 0;">
+                  Thank you for registering on our platform
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

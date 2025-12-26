@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"logtheus/internal/api/dto"
+	"logtheus/internal/config"
+	"logtheus/internal/consts"
 	"logtheus/internal/models"
 	"logtheus/internal/repository"
 
@@ -11,11 +13,24 @@ import (
 )
 
 type UserService struct {
-	repo *repository.UserRepository
+	repo         *repository.UserRepository
+	tokenService *TokenService
+	mailService  *MailService
+	cfg          *config.AppConfig
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{repo}
+func NewUserService(
+	repo *repository.UserRepository,
+	tokenService *TokenService,
+	mailService *MailService,
+	cfg *config.AppConfig,
+) *UserService {
+	return &UserService{
+		repo:         repo,
+		tokenService: tokenService,
+		mailService:  mailService,
+		cfg:          cfg,
+	}
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, id uint) (*models.User, error) {
@@ -25,7 +40,6 @@ func (s *UserService) GetUserByID(ctx context.Context, id uint) (*models.User, e
 func (s *UserService) CreateUser(ctx context.Context, req *dto.RegisterRequest) (*models.User, error) {
 
 	candidate, _ := s.repo.GetByEmail(req.Email)
-
 	if candidate != nil {
 		return nil, fmt.Errorf("User with email %s already exists", req.Email)
 	}
@@ -40,9 +54,15 @@ func (s *UserService) CreateUser(ctx context.Context, req *dto.RegisterRequest) 
 		Username: req.Username,
 		Password: string(passwordHash),
 	}
-
 	if err := s.repo.Create(user); err != nil {
 		return nil, err
 	}
+
+	token, err := s.tokenService.IssueToken(user.ID, consts.TYPE_VERIFY_TOKEN, consts.VERIFY_TOKEN_TTL)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to issue verification token: %w", err)
+	}
+	s.mailService.SendVerifyEmail(user.Email, user.Username, s.cfg.AppDomain, token)
+
 	return user, nil
 }
