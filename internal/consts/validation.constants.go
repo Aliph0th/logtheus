@@ -1,4 +1,4 @@
-package constants
+package consts
 
 var (
 	MIN_USERNAME_LEN uint = 4

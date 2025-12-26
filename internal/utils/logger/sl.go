@@ -2,7 +2,7 @@ package sl
 
 import (
 	"log/slog"
-	consts "logtheus/internal/constants"
+	"logtheus/internal/consts"
 	"os"
 	"time"
 

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	consts "logtheus/internal/constants"
+	"logtheus/internal/consts"
 
 	"github.com/gin-gonic/gin"
 )

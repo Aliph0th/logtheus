@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"logtheus/internal/api"
 	"logtheus/internal/config"
+	"logtheus/internal/consts"
 	"logtheus/internal/models"
 	"logtheus/internal/storage"
 	sl "logtheus/internal/utils/logger"
@@ -27,7 +28,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	db.Migrate(&models.User{})
+	if cfg.Env == consts.DEVELOPMENT {
+		db.Migrate(&models.User{}, &models.Token{})
+	}
 
 	defer db.Close()
 

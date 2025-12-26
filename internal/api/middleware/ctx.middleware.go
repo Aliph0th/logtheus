@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	consts "logtheus/internal/constants"
+	"logtheus/internal/consts"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
