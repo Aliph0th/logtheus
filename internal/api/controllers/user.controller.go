@@ -40,11 +40,24 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 func (c *UserController) VerifyEmail(ctx *gin.Context) {
 	data := utils.MustDTO[dto.VerifyEmailRequest](ctx)
 
-	accessToken, refreshToken, err := c.userService.VerifyUserEmail(ctx, data.Code)
+	accessToken, _, err := c.userService.VerifyUserEmail(ctx, data.Code)
 	if err != nil {
 		excepts.RespondError(ctx, err)
 		return
 	}
+	ctx.JSON(http.StatusOK, gin.H{"accessToken": accessToken})
+}
 
-	ctx.JSON(http.StatusOK, gin.H{"ok": true, "accessToken": accessToken, "refreshToken": refreshToken})
+func (c *UserController) Login(ctx *gin.Context) {
+	data := utils.MustDTO[dto.LoginRequest](ctx)
+	user, accessToken, refreshToken, err := c.userService.Login(ctx, &data)
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"user":         user,
+		"accessToken":  accessToken,
+		"refreshToken": refreshToken,
+	})
 }

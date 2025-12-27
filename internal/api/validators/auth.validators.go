@@ -42,3 +42,17 @@ var VerifyEmailValidators = []gin.HandlerFunc{
 	}).Chain().Numeric(&vgo.IsNumericOpts{}).Validate(),
 	middleware.ValidationMiddleware,
 }
+
+var LoginValidators = []gin.HandlerFunc{
+	gv.NewBody("email", func(value, _, _ string) string {
+		return fmt.Sprintf("Invalid email address: \"%s\"", value)
+	}).Chain().Email(&vgo.IsEmailOpts{}).Validate(),
+
+	gv.NewBody("password", func(_, _, _ string) string {
+		return fmt.Sprintf(
+			"Password must be at least %d characters long",
+			consts.MIN_PASSWORD_LEN,
+		)
+	}).Chain().Length(&vgo.IsLengthOpts{Min: consts.MIN_PASSWORD_LEN}).Validate(),
+	middleware.ValidationMiddleware,
+}

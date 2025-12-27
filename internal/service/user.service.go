@@ -100,3 +100,18 @@ func (s *UserService) VerifyUserEmail(ctx *gin.Context, code string) (string, st
 
 	return accessToken, refreshToken, nil
 }
+
+func (s *UserService) Login(ctx *gin.Context, req *dto.LoginRequest) (*models.User, string, string, error) {
+	user, _ := s.repo.GetByEmail(req.Email)
+	if user == nil {
+		return nil, "", "", excepts.WithUnauthorized("Invalid email or password")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, "", "", excepts.WithUnauthorized("Invalid email or password")
+	}
+	accessToken, refreshToken := s.tokenService.SignAuthTokens(&dto.UserAuthPayload{
+		UserID:          user.ID,
+		IsEmailVerified: user.IsEmailVerified,
+	})
+	return user, accessToken, refreshToken, nil
+}

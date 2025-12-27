@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Build initializes the DI container with all core dependencies.
 func Build(cfg *config.AppConfig, db *gorm.DB) *dig.Container {
 	c := dig.New()
 

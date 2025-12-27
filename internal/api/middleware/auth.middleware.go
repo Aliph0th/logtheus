@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthMiddleware(tokenService *service.TokenService) gin.HandlerFunc {
+func AuthMiddleware(allowNotVerifiedEmail bool, tokenService *service.TokenService) gin.HandlerFunc {
 
 	return func(ctx *gin.Context) {
 		header := ctx.GetHeader("Authorization")
@@ -29,10 +29,12 @@ func AuthMiddleware(tokenService *service.TokenService) gin.HandlerFunc {
 			excepts.RespondError(ctx, excepts.WithUnauthorized(err.Error()))
 			return
 		}
-		// Store authenticated user payload in context for downstream handlers
-		// Convert potential `int` to `uint` or keep as-is per dto definition
-		// Here we keep the struct as returned by claims
 		var payload dto.UserAuthPayload = claims.UserAuthPayload
+		if !allowNotVerifiedEmail && !payload.IsEmailVerified {
+			excepts.RespondError(ctx, excepts.WithUnauthorized("Email is not verified"))
+			return
+		}
+
 		ctx.Set(consts.AUTH_PAYLOAD_KEY, payload)
 		ctx.Next()
 	}

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log/slog"
 	"logtheus/internal/config"
+	"logtheus/internal/consts"
 	"path/filepath"
 	"strings"
 
@@ -63,11 +64,11 @@ func (s *MailService) renderVerifyEmailTemplate(username, domain, code string) (
 
 	url := fmt.Sprintf("%s/verify/%s", strings.TrimRight(domain, "/"), code)
 	data := struct {
-		Username string
-		Url      string
-		Code     string
-	}{Username: username, Url: url, Code: code}
-
+		Username  string
+		Url       string
+		Code      string
+		ExpiresIn uint8
+	}{Username: username, Url: url, Code: code, ExpiresIn: uint8(consts.VERIFY_TOKEN_TTL.Minutes())}
 	buffer := new(bytes.Buffer)
 	if err := template.Execute(buffer, data); err != nil {
 		return "", err

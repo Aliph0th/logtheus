@@ -18,6 +18,13 @@ func RegisterUserRoutes(api *gin.RouterGroup, container *dig.Container) {
 
 	users := api.Group("/users")
 	{
+		users.POST("/login",
+			append(
+				validators.LoginValidators,
+				middleware.BindDTO[dto.LoginRequest](),
+				controller.Login,
+			)...,
+		)
 		users.POST("/register",
 			append(
 				validators.RegisterValidators,
@@ -27,7 +34,7 @@ func RegisterUserRoutes(api *gin.RouterGroup, container *dig.Container) {
 		)
 		users.POST("/verify",
 			append(
-				[]gin.HandlerFunc{middleware.AuthMiddleware(tokenService)},
+				[]gin.HandlerFunc{middleware.AuthMiddleware(true, tokenService)},
 				append(
 					validators.VerifyEmailValidators,
 					middleware.BindDTO[dto.VerifyEmailRequest](),
