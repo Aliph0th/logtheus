@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"logtheus/internal/api/dto"
+	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/service"
 	utils "logtheus/internal/utils"
 
@@ -23,11 +24,27 @@ func NewUserController(userService *service.UserService) *UserController {
 func (c *UserController) CreateUser(ctx *gin.Context) {
 	data := utils.MustDTO[dto.RegisterRequest](ctx)
 
-	user, err := c.userService.CreateUser(ctx, &data)
+	user, accessToken, refreshToken, err := c.userService.CreateUser(ctx, &data)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		excepts.RespondError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, user)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"user":         user,
+		"accessToken":  accessToken,
+		"refreshToken": refreshToken,
+	})
+}
+
+func (c *UserController) VerifyEmail(ctx *gin.Context) {
+	data := utils.MustDTO[dto.VerifyEmailRequest](ctx)
+
+	accessToken, refreshToken, err := c.userService.VerifyUserEmail(ctx, data.Code)
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"ok": true, "accessToken": accessToken, "refreshToken": refreshToken})
 }

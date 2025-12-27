@@ -35,3 +35,10 @@ var RegisterValidators = []gin.HandlerFunc{
 	}).Chain().Length(&vgo.IsLengthOpts{Min: consts.MIN_PASSWORD_LEN}).Validate(),
 	middleware.ValidationMiddleware,
 }
+
+var VerifyEmailValidators = []gin.HandlerFunc{
+	gv.NewBody("code", func(_, _, _ string) string {
+		return "Invalid verification code"
+	}).Chain().Numeric(&vgo.IsNumericOpts{}).Validate(),
+	middleware.ValidationMiddleware,
+}

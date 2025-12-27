@@ -8,11 +8,16 @@ type RegisterRequest struct {
 	Username string `json:"username" binding:"required"`
 }
 
+type VerifyEmailRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
 type UserAuthClaims struct {
 	jwt.RegisteredClaims
-	UserID int `json:"userID,omitempty"`
+	UserAuthPayload
 }
 
 type UserAuthPayload struct {
-	UserID int `json:"userID,omitempty"`
+	UserID          uint `json:"userID,omitempty"`
+	IsEmailVerified bool `json:"isEmailVerified"`
 }

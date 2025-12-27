@@ -70,7 +70,6 @@ func (s *MailService) renderVerifyEmailTemplate(username, domain, code string) (
 
 	buffer := new(bytes.Buffer)
 	if err := template.Execute(buffer, data); err != nil {
-		slog.Error("Failed to execute", "err", err)
 		return "", err
 	}
 	return buffer.String(), nil

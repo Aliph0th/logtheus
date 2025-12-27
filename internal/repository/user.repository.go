@@ -33,3 +33,7 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) VerifyEmail(userID uint) error {
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("is_email_verified", true).Error
+}

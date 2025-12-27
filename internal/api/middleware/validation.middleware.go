@@ -1,8 +1,7 @@
 package middleware
 
 import (
-	"log/slog"
-	sl "logtheus/internal/utils/logger"
+	excepts "logtheus/internal/api/exceptions"
 	"net/http"
 
 	gv "github.com/bube054/ginvalidator"
@@ -12,17 +11,12 @@ import (
 func ValidationMiddleware(ctx *gin.Context) {
 	result, err := gv.ValidationResult(ctx)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"message": "The server encountered an unexpected error.",
-		})
-		slog.Error("Internal error", sl.Error(err))
+		excepts.RespondError(ctx, err)
 		return
 	}
 
 	if len(result) != 0 {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-			"errors": result,
-		})
+		excepts.RespondError(ctx, excepts.NewWithDetails(http.StatusBadRequest, "Validation failed", result))
 		return
 	}
 

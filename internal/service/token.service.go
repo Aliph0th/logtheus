@@ -1,8 +1,10 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"logtheus/internal/api/dto"
+	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/config"
 	"logtheus/internal/consts"
 	"logtheus/internal/models"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type TokenService struct {
@@ -25,7 +28,7 @@ func NewTokenService(repo *repository.TokenRepository, cfg *config.AppConfig) *T
 
 func (s *TokenService) SignAuthTokens(p *dto.UserAuthPayload) (string, string) {
 	claims := dto.UserAuthClaims{
-		UserID: p.UserID,
+		UserAuthPayload: *p,
 	}
 	accessToken, _ := s.signJWTWithClaims(claims, s.cfg.JWT.AccessSecret, consts.ACCESS_TOKEN_TTL)
 	refreshToken, _ := s.signJWTWithClaims(claims, s.cfg.JWT.RefreshSecret, consts.REFRESH_TOKEN_TTL)
@@ -51,6 +54,26 @@ func (s *TokenService) IssueToken(userID uint, tokenType consts.TokenType, ttl t
 		ExpiresAt: time.Now().Add(ttl),
 	})
 	return token, nil
+}
+
+func (s *TokenService) ConsumeToken(userID uint, token string, tokenType consts.TokenType) (*models.Token, error) {
+	tokenModel, err := s.repo.GetByToken(token)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, excepts.WithNotFound("Token not found")
+		}
+		return nil, excepts.Wrap(err, 500, "TOKEN_FETCH_FAILED")
+	}
+	if tokenModel.ExpiresAt.Before(time.Now()) {
+		return nil, excepts.WithNotFound("Token not found")
+	}
+	if tokenModel.UserID != userID || tokenModel.Type != tokenType {
+		return nil, excepts.WithBadRequest("Token does not match user or type")
+	}
+	if err := s.repo.Delete(token); err != nil {
+		return nil, excepts.Wrap(err, 500, "TOKEN_DELETE_FAILED")
+	}
+	return tokenModel, nil
 }
 
 func (s *TokenService) generateToken(tokenType consts.TokenType) (string, error) {
