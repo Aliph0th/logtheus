@@ -5,11 +5,11 @@ import (
 )
 
 type User struct {
-	ID              uint      `gorm:"primaryKey;autoIncrement"`
-	Email           string    `gorm:"uniqueIndex;not null;"`
-	Password        string    `gorm:"not null"`
-	Username        string    `gorm:"not null"`
-	IsEmailVerified bool      `gorm:"default:false"`
-	CreatedAt       time.Time `gorm:"not null"`
-	UpdatedAt       time.Time `gorm:"not null"`
+	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Email           string    `gorm:"uniqueIndex;not null;" json:"email"`
+	Password        string    `gorm:"not null" json:"-"`
+	Username        string    `gorm:"not null" json:"username"`
+	IsEmailVerified bool      `gorm:"default:false" json:"isEmailVerified"`
+	CreatedAt       time.Time `gorm:"not null" json:"createdAt"`
+	UpdatedAt       time.Time `gorm:"not null" json:"updatedAt"`
 }

@@ -5,16 +5,16 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"go.uber.org/dig"
 )
 
-func NewRouter(db *gorm.DB) *gin.Engine {
+func NewRouter(container *dig.Container) *gin.Engine {
 	router := gin.Default()
 	router.Use(cors.Default())
 
 	api := router.Group("/api/v1")
 	{
-		routes.RegisterUserRoutes(api, db)
+		routes.RegisterUserRoutes(api, container)
 	}
 	return router
 }

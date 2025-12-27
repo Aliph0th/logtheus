@@ -6,6 +6,7 @@ import (
 	"logtheus/internal/api"
 	"logtheus/internal/config"
 	"logtheus/internal/consts"
+	"logtheus/internal/di"
 	"logtheus/internal/models"
 	"logtheus/internal/storage"
 	sl "logtheus/internal/utils/logger"
@@ -34,7 +35,8 @@ func main() {
 
 	defer db.Close()
 
-	router := api.NewRouter(db.DB)
+	container := di.Build(cfg, db.DB)
+	router := api.NewRouter(container)
 
 	slog.Info("Server starting", "mode", cfg.Env, "port", cfg.Server.Port)
 	if err := router.Run(fmt.Sprintf("localhost:%d", cfg.Server.Port)); err != nil {

@@ -4,21 +4,31 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"logtheus/internal/config"
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/gomail.v2"
+	"github.com/wneessen/go-mail"
 )
 
 type MailService struct {
-	dialer     *gomail.Dialer
+	client     *mail.Client
 	fromHeader string
 }
 
 func NewMailService(cfg *config.AppConfig) *MailService {
-	dialer := gomail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Login, cfg.SMTP.Password)
-	return &MailService{dialer: dialer, fromHeader: cfg.SMTP.From}
+	client, err := mail.NewClient(
+		cfg.SMTP.Host,
+		mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover),
+		mail.WithUsername(cfg.SMTP.Login),
+		mail.WithPassword(cfg.SMTP.Password),
+		mail.WithPort(cfg.SMTP.Port),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return &MailService{client: client, fromHeader: cfg.SMTP.From}
 }
 
 func (s *MailService) SendVerifyEmail(to, username, domain, code string) error {
@@ -30,12 +40,17 @@ func (s *MailService) SendVerifyEmail(to, username, domain, code string) error {
 }
 
 func (s *MailService) sendMail(to, subject, body string) error {
-	message := gomail.NewMessage()
-	message.SetHeader("From", s.fromHeader)
-	message.SetHeader("To", to)
-	message.SetHeader("Subject", subject)
-	message.SetBody("text/html", body)
-	return s.dialer.DialAndSend(message)
+	message := mail.NewMsg()
+	message.From(s.fromHeader)
+	message.To(to)
+	message.Subject(subject)
+	message.SetBodyString(mail.TypeTextHTML, body)
+	slog.Info("Sending email", "to", to, "subject", subject)
+	err := s.client.DialAndSend(message)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *MailService) renderVerifyEmailTemplate(username, domain, code string) (string, error) {
@@ -55,6 +70,7 @@ func (s *MailService) renderVerifyEmailTemplate(username, domain, code string) (
 
 	buffer := new(bytes.Buffer)
 	if err := template.Execute(buffer, data); err != nil {
+		slog.Error("Failed to execute", "err", err)
 		return "", err
 	}
 	return buffer.String(), nil

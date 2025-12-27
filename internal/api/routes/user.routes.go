@@ -5,17 +5,14 @@ import (
 	"logtheus/internal/api/dto"
 	"logtheus/internal/api/middleware"
 	"logtheus/internal/api/validators"
-	"logtheus/internal/repository"
-	"logtheus/internal/service"
+	"logtheus/internal/utils"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"go.uber.org/dig"
 )
 
-func RegisterUserRoutes(api *gin.RouterGroup, db *gorm.DB) {
-	repository := repository.NewUserRepository(db)
-	service := service.NewUserService(repository)
-	controller := controllers.NewUserController(service)
+func RegisterUserRoutes(api *gin.RouterGroup, container *dig.Container) {
+	controller := utils.MustResolve[*controllers.UserController](container)
 
 	users := api.Group("/users")
 	{

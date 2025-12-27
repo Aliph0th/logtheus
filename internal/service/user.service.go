@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"logtheus/internal/api/dto"
 	"logtheus/internal/config"
 	"logtheus/internal/consts"
@@ -62,7 +63,11 @@ func (s *UserService) CreateUser(ctx context.Context, req *dto.RegisterRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to issue verification token: %w", err)
 	}
-	s.mailService.SendVerifyEmail(user.Email, user.Username, s.cfg.AppDomain, token)
+	go func(email, username, domain, code string) {
+		if err := s.mailService.SendVerifyEmail(email, username, domain, code); err != nil {
+			slog.Error("Verification email failed", "email", email, "err", err)
+		}
+	}(user.Email, user.Username, s.cfg.AppDomain, token)
 
 	return user, nil
 }
