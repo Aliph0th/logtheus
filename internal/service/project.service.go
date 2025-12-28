@@ -47,3 +47,15 @@ func (s *ProjectService) GetMyProjects(ctx *gin.Context) ([]*models.Project, err
 	}
 	return projects, nil
 }
+
+func (s *ProjectService) GetProjectByID(ctx *gin.Context, id uint64) (*models.Project, error) {
+	auth := utils.MustAuth(ctx)
+	project, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if project.OwnerID != auth.UserID {
+		return nil, excepts.WithNotFound("Project not found")
+	}
+	return project, nil
+}

@@ -37,7 +37,7 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) GetUserByID(ctx *gin.Context, id uint) (*models.User, error) {
+func (s *UserService) GetUserByID(ctx *gin.Context, id uint64) (*models.User, error) {
 	return s.repo.GetByID(id)
 }
 
@@ -114,4 +114,13 @@ func (s *UserService) Login(ctx *gin.Context, req *dto.LoginRequest) (*models.Us
 		IsEmailVerified: user.IsEmailVerified,
 	})
 	return user, accessToken, refreshToken, nil
+}
+
+func (s *UserService) GetCurrentUser(ctx *gin.Context) (*models.User, error) {
+	auth := utils.MustAuth(ctx)
+	user, err := s.repo.GetByID(auth.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }

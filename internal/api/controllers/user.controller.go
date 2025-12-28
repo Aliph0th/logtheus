@@ -61,3 +61,12 @@ func (c *UserController) Login(ctx *gin.Context) {
 		"refreshToken": refreshToken,
 	})
 }
+
+func (c *UserController) GetCurrentUser(ctx *gin.Context) {
+	user, err := c.userService.GetCurrentUser(ctx)
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"user": user})
+}

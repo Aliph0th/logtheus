@@ -18,7 +18,7 @@ func (r *UserRepository) Create(user *models.User) error {
 	return r.db.Create(user).Error
 }
 
-func (r *UserRepository) GetByID(id uint) (*models.User, error) {
+func (r *UserRepository) GetByID(id uint64) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -34,6 +34,6 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-func (r *UserRepository) VerifyEmail(userID uint) error {
+func (r *UserRepository) VerifyEmail(userID uint64) error {
 	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("is_email_verified", true).Error
 }

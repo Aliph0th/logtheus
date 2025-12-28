@@ -42,7 +42,7 @@ func (s *TokenService) VerifyRefreshToken(token string) (*dto.UserAuthClaims, er
 	return s.verifyJWT(token, s.cfg.JWT.RefreshSecret)
 }
 
-func (s *TokenService) IssueToken(userID uint, tokenType consts.TokenType, ttl time.Duration) (string, error) {
+func (s *TokenService) IssueToken(userID uint64, tokenType consts.TokenType, ttl time.Duration) (string, error) {
 	token, err := s.generateToken(tokenType)
 	if err != nil {
 		return "", fmt.Errorf("Error generating token: %w", err)
@@ -56,7 +56,7 @@ func (s *TokenService) IssueToken(userID uint, tokenType consts.TokenType, ttl t
 	return token, nil
 }
 
-func (s *TokenService) ConsumeToken(userID uint, token string, tokenType consts.TokenType) (*models.Token, error) {
+func (s *TokenService) ConsumeToken(userID uint64, token string, tokenType consts.TokenType) (*models.Token, error) {
 	tokenModel, err := s.repo.GetByToken(token)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -1,10 +1,10 @@
 package models
 
 type Application struct {
-	ID          uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID          uint64  `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name        string  `gorm:"not null" json:"name"`
 	Description string  `json:"description"`
-	ProjectID   uint    `gorm:"not null" json:"projectID"`
+	ProjectID   uint64  `gorm:"not null" json:"projectID"`
 	Project     Project `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE;" json:"project"`
 
 	CreatedAt uint64 `gorm:"autoCreateTime" json:"createdAt"`

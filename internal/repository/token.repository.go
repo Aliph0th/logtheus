@@ -26,7 +26,7 @@ func (r *TokenRepository) GetByToken(token string) (*models.Token, error) {
 	return &tokenModel, nil
 }
 
-func (r *TokenRepository) GetTokensByUserID(userID uint) ([]models.Token, error) {
+func (r *TokenRepository) GetTokensByUserID(userID uint64) ([]models.Token, error) {
 	var tokens []models.Token
 	if err := r.db.Find(&tokens, "user_id = ?", userID).Error; err != nil {
 		return nil, err
@@ -38,6 +38,6 @@ func (r *TokenRepository) Delete(token string) error {
 	return r.db.Where("token = ?", token).Delete(&models.Token{}).Error
 }
 
-func (r *TokenRepository) DeleteByUserID(userID uint) error {
+func (r *TokenRepository) DeleteByUserID(userID uint64) error {
 	return r.db.Where("user_id = ?", userID).Delete(&models.Token{}).Error
 }

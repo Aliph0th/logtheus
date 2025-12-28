@@ -23,6 +23,6 @@ type UserAuthClaims struct {
 }
 
 type UserAuthPayload struct {
-	UserID          uint `json:"userID,omitempty"`
-	IsEmailVerified bool `json:"isEmailVerified"`
+	UserID          uint64 `json:"userID,omitempty"`
+	IsEmailVerified bool   `json:"isEmailVerified"`
 }
