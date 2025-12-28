@@ -3,9 +3,11 @@ package controllers
 import (
 	"logtheus/internal/api/dto"
 	excepts "logtheus/internal/api/exceptions"
+	"logtheus/internal/consts"
 	"logtheus/internal/service"
 	utils "logtheus/internal/utils"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,7 +28,7 @@ func (c *ProjectController) CreateProject(ctx *gin.Context) {
 		excepts.RespondError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusCreated, gin.H{"project": project})
+	ctx.JSON(http.StatusCreated, gin.H{"project": project, "max": consts.MAX_PROJECTS_PER_USER})
 }
 
 func (c *ProjectController) GetMyProjects(ctx *gin.Context) {
@@ -35,5 +37,15 @@ func (c *ProjectController) GetMyProjects(ctx *gin.Context) {
 		excepts.RespondError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"projects": projects})
+	ctx.JSON(http.StatusOK, gin.H{"projects": projects, "max": consts.MAX_PROJECTS_PER_USER})
+}
+
+func (c *ProjectController) GetProjectByID(ctx *gin.Context) {
+	id, _ := strconv.ParseUint(ctx.Param("id"), 10, 64)
+	project, err := c.projectService.GetProjectByID(ctx, id)
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"project": project})
 }

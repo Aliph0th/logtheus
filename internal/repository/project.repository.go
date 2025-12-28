@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"errors"
+	excepts "logtheus/internal/api/exceptions"
+	"logtheus/internal/consts/enums"
 	"logtheus/internal/models"
 
 	"gorm.io/gorm"
@@ -21,6 +24,9 @@ func (r *ProjectRepository) Create(project *models.Project) error {
 func (r *ProjectRepository) GetByID(id uint64) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.First(&project, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, excepts.WithNotFound("Project not found")
+		}
 		return nil, err
 	}
 	return &project, nil
@@ -40,4 +46,15 @@ func (r *ProjectRepository) GetByUserID(userID uint64) ([]*models.Project, error
 		return nil, err
 	}
 	return projects, nil
+}
+
+func (r *ProjectRepository) GetMemberRole(userID, projectID uint64) (*enums.ProjectRole, error) {
+	var member models.ProjectMember
+	if err := r.db.First(&member, "user_id = ? AND project_id = ? AND is_accepted = TRUE", userID, projectID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &member.Role, nil
 }

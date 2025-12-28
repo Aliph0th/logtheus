@@ -7,6 +7,7 @@ import (
 	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/config"
 	"logtheus/internal/consts"
+	"logtheus/internal/consts/enums"
 	"logtheus/internal/models"
 	"logtheus/internal/repository"
 	"logtheus/internal/utils"
@@ -62,7 +63,7 @@ func (s *UserService) CreateUser(ctx *gin.Context, req *dto.RegisterRequest) (*m
 		return nil, "", "", excepts.Wrap(err, 500, "USER_CREATE_FAILED")
 	}
 
-	token, err := s.tokenService.IssueToken(user.ID, consts.TYPE_VERIFY_TOKEN, consts.VERIFY_TOKEN_TTL)
+	token, err := s.tokenService.IssueToken(user.ID, enums.TOKEN_TYPE_VERIFY, consts.VERIFY_TOKEN_TTL)
 	if err != nil {
 		return nil, "", "", excepts.Wrap(err, 500, "TOKEN_ISSUE_FAILED")
 	}
@@ -85,7 +86,7 @@ func (s *UserService) VerifyUserEmail(ctx *gin.Context, code string) (string, st
 	if auth.IsEmailVerified {
 		return "", "", excepts.WithBadRequest("Email is already verified")
 	}
-	token, err := s.tokenService.ConsumeToken(auth.UserID, code, consts.TYPE_VERIFY_TOKEN)
+	token, err := s.tokenService.ConsumeToken(auth.UserID, code, enums.TOKEN_TYPE_VERIFY)
 	if err != nil {
 		return "", "", err
 	}

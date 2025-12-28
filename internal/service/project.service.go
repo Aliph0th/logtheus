@@ -25,7 +25,7 @@ func (s *ProjectService) CreateProject(ctx *gin.Context, dto *dto.ProjectCreateR
 
 	existingCount, _ := s.repo.CountUserProjects(auth.UserID)
 	if existingCount >= consts.MAX_PROJECTS_PER_USER {
-		return nil, excepts.WithConflict(fmt.Sprintf("project limit of %d reached", consts.MAX_PROJECTS_PER_USER))
+		return nil, excepts.WithConflict(fmt.Sprintf("Project limit of %d reached", consts.MAX_PROJECTS_PER_USER))
 	}
 	project := &models.Project{
 		Name:        dto.Name,
@@ -54,8 +54,13 @@ func (s *ProjectService) GetProjectByID(ctx *gin.Context, id uint64) (*models.Pr
 	if err != nil {
 		return nil, err
 	}
-	if project.OwnerID != auth.UserID {
+	if !s.isMemberOfProject(auth.UserID, id) {
 		return nil, excepts.WithNotFound("Project not found")
 	}
 	return project, nil
+}
+
+func (s *ProjectService) isMemberOfProject(userID, projectID uint64) bool {
+	role, _ := s.repo.GetMemberRole(userID, projectID)
+	return role != nil
 }

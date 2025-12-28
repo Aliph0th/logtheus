@@ -7,6 +7,7 @@ import (
 	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/config"
 	"logtheus/internal/consts"
+	"logtheus/internal/consts/enums"
 	"logtheus/internal/models"
 	"logtheus/internal/repository"
 	"logtheus/internal/utils"
@@ -42,7 +43,7 @@ func (s *TokenService) VerifyRefreshToken(token string) (*dto.UserAuthClaims, er
 	return s.verifyJWT(token, s.cfg.JWT.RefreshSecret)
 }
 
-func (s *TokenService) IssueToken(userID uint64, tokenType consts.TokenType, ttl time.Duration) (string, error) {
+func (s *TokenService) IssueToken(userID uint64, tokenType enums.TokenType, ttl time.Duration) (string, error) {
 	token, err := s.generateToken(tokenType)
 	if err != nil {
 		return "", fmt.Errorf("Error generating token: %w", err)
@@ -56,7 +57,7 @@ func (s *TokenService) IssueToken(userID uint64, tokenType consts.TokenType, ttl
 	return token, nil
 }
 
-func (s *TokenService) ConsumeToken(userID uint64, token string, tokenType consts.TokenType) (*models.Token, error) {
+func (s *TokenService) ConsumeToken(userID uint64, token string, tokenType enums.TokenType) (*models.Token, error) {
 	tokenModel, err := s.repo.GetByToken(token)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -76,11 +77,11 @@ func (s *TokenService) ConsumeToken(userID uint64, token string, tokenType const
 	return tokenModel, nil
 }
 
-func (s *TokenService) generateToken(tokenType consts.TokenType) (string, error) {
+func (s *TokenService) generateToken(tokenType enums.TokenType) (string, error) {
 	switch tokenType {
-	case consts.TYPE_RESET_TOKEN:
+	case enums.TOKEN_TYPE_PASSWORD_RESET:
 		return uuid.NewString(), nil
-	case consts.TYPE_VERIFY_TOKEN:
+	case enums.TOKEN_TYPE_VERIFY:
 		return utils.GenerateCryptoRandomInt(consts.VERIFY_TOKEN_LENGTH)
 	default:
 		return "", fmt.Errorf("Unsupported token type for generation: %s", tokenType)

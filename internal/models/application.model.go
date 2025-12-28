@@ -1,7 +1,7 @@
 package models
 
 type Application struct {
-	ID          uint64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID          uint64  `gorm:"primaryKey" json:"id"`
 	Name        string  `gorm:"not null" json:"name"`
 	Description string  `json:"description"`
 	ProjectID   uint64  `gorm:"not null" json:"projectID"`
