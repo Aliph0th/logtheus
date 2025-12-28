@@ -30,7 +30,7 @@ func main() {
 	}
 
 	if cfg.Env == consts.DEVELOPMENT {
-		db.Migrate(&models.User{}, &models.Token{})
+		db.Migrate(&models.User{}, &models.Token{}, &models.Project{}, &models.Application{})
 	}
 
 	defer db.Close()
