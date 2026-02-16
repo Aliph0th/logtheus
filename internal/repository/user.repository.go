@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/models"
 
 	"gorm.io/gorm"
@@ -21,6 +23,9 @@ func (r *UserRepository) Create(user *models.User) error {
 func (r *UserRepository) GetByID(id uint64) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, excepts.WithNotFound("User not found")
+		}
 		return nil, err
 	}
 	return &user, nil
@@ -29,6 +34,9 @@ func (r *UserRepository) GetByID(id uint64) (*models.User, error) {
 func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "email = ?", email).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, excepts.WithNotFound("User not found")
+		}
 		return nil, err
 	}
 	return &user, nil

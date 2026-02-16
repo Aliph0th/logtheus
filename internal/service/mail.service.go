@@ -40,6 +40,14 @@ func (s *MailService) SendVerifyEmail(to, username, domain, code string) error {
 	return s.sendMail(to, "Logtheus email verification", body)
 }
 
+func (s *MailService) SendInviteEmail(to, inviterName, projectName, domain, code string) error {
+	body, err := s.renderInviteEmailTemplate(inviterName, projectName, domain, code)
+	if err != nil {
+		return err
+	}
+	return s.sendMail(to, fmt.Sprintf("You're invited to join %s on Logtheus", projectName), body)
+}
+
 func (s *MailService) sendMail(to, subject, body string) error {
 	message := mail.NewMsg()
 	message.From(s.fromHeader)
@@ -69,6 +77,27 @@ func (s *MailService) renderVerifyEmailTemplate(username, domain, code string) (
 		Code      string
 		ExpiresIn uint8
 	}{Username: username, Url: url, Code: code, ExpiresIn: uint8(consts.VERIFY_TOKEN_TTL.Minutes())}
+	buffer := new(bytes.Buffer)
+	if err := template.Execute(buffer, data); err != nil {
+		return "", err
+	}
+	return buffer.String(), nil
+}
+
+func (s *MailService) renderInviteEmailTemplate(inviterName, projectName, domain, code string) (string, error) {
+	templatePath := filepath.Join("internal", "templates", "invite_member.html")
+
+	template, err := template.New("invite_member.html").ParseFiles(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("Error parsing email template: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/accept-invite/%s", strings.TrimRight(domain, "/"), code)
+	data := struct {
+		InviterName string
+		ProjectName string
+		InviteLink  string
+	}{InviterName: inviterName, ProjectName: projectName, InviteLink: url}
 	buffer := new(bytes.Buffer)
 	if err := template.Execute(buffer, data); err != nil {
 		return "", err

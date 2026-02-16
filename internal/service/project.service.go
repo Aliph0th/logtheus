@@ -5,6 +5,7 @@ import (
 	"logtheus/internal/api/dto"
 	excepts "logtheus/internal/api/exceptions"
 	"logtheus/internal/consts"
+	"logtheus/internal/consts/enums"
 	"logtheus/internal/models"
 	"logtheus/internal/repository"
 	"logtheus/internal/utils"
@@ -38,6 +39,10 @@ func (s *ProjectService) CreateProject(ctx *gin.Context, dto *dto.ProjectCreateR
 	return project, nil
 }
 
+func (s *ProjectService) GetByID(id uint64) (*models.Project, error) {
+	return s.repo.GetByID(id)
+}
+
 func (s *ProjectService) GetMyProjects(ctx *gin.Context) ([]*models.Project, error) {
 	auth := utils.MustAuth(ctx)
 
@@ -54,13 +59,21 @@ func (s *ProjectService) GetProjectByID(ctx *gin.Context, id uint64) (*models.Pr
 	if err != nil {
 		return nil, err
 	}
-	if !s.isMemberOfProject(auth.UserID, id) {
+	if !s.IsMember(auth.UserID, id) {
 		return nil, excepts.WithNotFound("Project not found")
 	}
 	return project, nil
 }
 
-func (s *ProjectService) isMemberOfProject(userID, projectID uint64) bool {
+func (s *ProjectService) GetMemberRole(userID, projectID uint64) (*enums.ProjectRole, error) {
+	return s.repo.GetMemberRole(userID, projectID)
+}
+
+func (s *ProjectService) IsMember(userID, projectID uint64) bool {
 	role, _ := s.repo.GetMemberRole(userID, projectID)
 	return role != nil
+}
+
+func (s *ProjectService) CountMembers(projectID uint64) (uint16, error) {
+	return s.repo.CountProjectMembers(projectID)
 }

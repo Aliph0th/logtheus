@@ -38,8 +38,11 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) GetUserByID(ctx *gin.Context, id uint64) (*models.User, error) {
+func (s *UserService) GetUserByID(id uint64) (*models.User, error) {
 	return s.repo.GetByID(id)
+}
+func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
+	return s.repo.GetByEmail(email)
 }
 
 func (s *UserService) CreateUser(ctx *gin.Context, req *dto.RegisterRequest) (*models.User, string, string, error) {

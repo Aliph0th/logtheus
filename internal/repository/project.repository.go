@@ -40,6 +40,14 @@ func (r *ProjectRepository) CountUserProjects(userID uint64) (uint8, error) {
 	return uint8(count), nil
 }
 
+func (r *ProjectRepository) CountProjectMembers(projectID uint64) (uint16, error) {
+	var count int64
+	if err := r.db.Model(&models.ProjectMember{}).Where("project_id = ?", projectID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return uint16(count), nil
+}
+
 func (r *ProjectRepository) GetByUserID(userID uint64) ([]*models.Project, error) {
 	var projects []*models.Project
 	if err := r.db.Where("owner_id = ?", userID).Find(&projects).Error; err != nil {

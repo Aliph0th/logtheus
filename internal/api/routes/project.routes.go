@@ -29,5 +29,6 @@ func RegisterProjectRoutes(api *gin.RouterGroup, container *dig.Container) {
 		projects.GET(":id", validators.DatabaseID("id"), controller.GetProjectByID)
 		// projects.PUT(":id")
 
+		RegisterInvitesRoutes(projects, container)
 	}
 }
