@@ -1,0 +1,51 @@
+syntax = "proto3";
+package logtheus.auth.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/user";
+
+import "google/protobuf/timestamp.proto";
+
+message User {
+  int64                     id                = 1;
+  string                    email             = 2;
+  string                    username          = 3;
+  bool                      is_email_verified = 4;
+  google.protobuf.Timestamp created_at        = 5;
+  google.protobuf.Timestamp updated_at        = 6;
+}
+
+// Provides user services
+service UserService {
+  // Registers a new user.
+  rpc RegisterUser (RegisterUserRequest) returns (SuccessAuthUserResponse);
+
+  // Authenticates a user.
+  rpc LoginUser (LoginUserRequest) returns (SuccessAuthUserResponse);
+
+  // Verifies a user's email address.
+  rpc VerifyUserEmail (VerifyUserEmailRequest) returns (VerifyUserEmailResponse);
+}
+
+message RegisterUserRequest {
+  string email    = 1;
+  string password = 2;
+  string username = 3;
+}
+
+message LoginUserRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message VerifyUserEmailRequest {
+  string code = 1;
+}
+
+message SuccessAuthUserResponse {
+  User   user          = 1;
+  string access_token  = 2;
+  string refresh_token = 3;
+}
+
+message VerifyUserEmailResponse {
+  string access_token = 1;
+}
