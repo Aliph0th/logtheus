@@ -6,17 +6,31 @@ import (
 	"net"
 
 	userProto "logtheus/shared/pkg/pb/v1/user"
+	"logtheus/shared/pkg/utils"
+	"logtheus/user/internal/api/interceptors"
 
+	"go.uber.org/dig"
 	"google.golang.org/grpc"
 )
 
-func StartGRPCServer(port int, handler *UserHandler) error {
+func StartGRPCServer(port int, container *dig.Container) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("failed to listen on port %d: %w", port, err)
 	}
 
-	grpcServer := grpc.NewServer()
+	handler := utils.MustResolve[*UserHandler](container)
+	authInterceptor := utils.MustResolve[*interceptors.AuthInterceptor](container)
+	errorInterceptor := utils.MustResolve[*interceptors.ErrorInterceptor](container)
+
+	chainedInterceptor := interceptors.ChainUnaryInterceptor(
+		authInterceptor.Unary(),
+		errorInterceptor.Unary(),
+	)
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(chainedInterceptor),
+	)
 	userProto.RegisterUserServiceServer(grpcServer, handler)
 
 	slog.Info("[USER_SERVICE] gRPC server starting", "port", port)

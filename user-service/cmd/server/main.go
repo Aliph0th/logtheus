@@ -8,9 +8,8 @@ import (
 	sl "logtheus/shared/pkg/utils/logger"
 	"logtheus/user/internal/api"
 	"logtheus/user/internal/config"
+	"logtheus/user/internal/di"
 	"logtheus/user/internal/models"
-	"logtheus/user/internal/repository"
-	service "logtheus/user/internal/services"
 	"logtheus/user/internal/storages"
 	"os"
 )
@@ -36,11 +35,9 @@ func main() {
 		db.Migrate(&models.User{})
 	}
 
-	userRepository := repository.NewUserRepository(db.DB)
-	userService := service.NewUserService(userRepository, cfg)
-	handler := api.NewUserHandler(userService)
+	container := di.Build(cfg, db.DB)
 
-	if err := api.StartGRPCServer(cfg.Server.Port, handler); err != nil {
+	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {
 		slog.Error("Failed to start gRPC server", sl.Error(err))
 		os.Exit(1)
 	}

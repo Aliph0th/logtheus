@@ -1,9 +1,7 @@
 package grpc
 
 import (
-	"errors"
-	"log/slog"
-
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -12,45 +10,34 @@ type GRPCError struct {
 	Code    codes.Code
 	Message string
 	Slug    string
-	Err     error
 }
 
 func NewGRPCError(code codes.Code, message string) *GRPCError {
 	return &GRPCError{Code: code, Message: message}
 }
 
-func NewGRPCErrorWithMessage(code codes.Code, message string, err error) *GRPCError {
-	return &GRPCError{Code: code, Message: message, Err: err}
-}
-
 func (e *GRPCError) Error() string {
 	if e.Message != "" {
 		return e.Message
 	}
-	if e.Err != nil {
-		return e.Err.Error()
-	}
 	return e.Code.String()
+}
+
+func (e *GRPCError) WithSlug(slug string) *GRPCError {
+	e.Slug = slug
+	return e
 }
 
 func (e *GRPCError) ToGRPCStatus() error {
 	st := status.New(e.Code, e.Message)
-	// if e.Slug != "" {
-	// 	newSt, err := st.WithDetails(protoadapt.MessageV1Of(e.Slug))
-	// 	if err != nil {
-	// 		slog.Warn("failed to add details to gRPC status", "error", err)
-	// 	} else {
-	// 		st = newSt
-	// 	}
-	// }
-
+	if e.Slug != "" {
+		errdetails := &errdetails.ErrorInfo{
+			Reason: e.Slug,
+		}
+		st, _ = st.WithDetails(errdetails)
+	}
 	return st.Err()
 }
-
-// func (e *GRPCError) WithSlug(slug string) *GRPCError {
-// 	e.Slug = slug
-// 	return e
-// }
 
 func WithInvalidArgument(msg string) *GRPCError {
 	return NewGRPCError(codes.InvalidArgument, msg)
@@ -76,19 +63,28 @@ func WithInternal(msg string) *GRPCError {
 	return NewGRPCError(codes.Internal, msg)
 }
 
-func HandleError(err error, op string) error {
-	if err == nil {
-		return nil
-	}
+func WithInternalError(slug, msg string) *GRPCError {
+	return NewGRPCError(codes.Internal, msg).WithSlug(slug)
+}
 
-	var grpcErr *GRPCError
-	if errors.As(err, &grpcErr) {
-		if grpcErr != nil {
-			slog.Warn("gRPC operation failed", "operation", op, "code", grpcErr.Code.String(), "message", grpcErr.Message)
-			return grpcErr.ToGRPCStatus()
+func GetErrorSlug(err error) string {
+	if grpcErr, ok := err.(*GRPCError); ok {
+		return grpcErr.Slug
+	}
+	return ""
+}
+
+func FormatErrorResponse(err error) map[string]interface{} {
+	if grpcErr, ok := err.(*GRPCError); ok {
+		return map[string]interface{}{
+			"code":    grpcErr.Code.String(),
+			"message": grpcErr.Message,
+			"slug":    grpcErr.Slug,
 		}
 	}
-
-	slog.Error("Unexpected error", "operation", op, "error", err)
-	return status.Error(codes.Internal, "Internal Server Error")
+	return map[string]interface{}{
+		"code":    "UNKNOWN",
+		"message": err.Error(),
+		"slug":    "",
+	}
 }

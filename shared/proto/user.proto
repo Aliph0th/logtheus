@@ -1,11 +1,11 @@
 syntax = "proto3";
-package logtheus.auth.v1;
+package logtheus.user.v1;
 option go_package = "logtheus/shared/pkg/pb/v1/user";
 
 import "google/protobuf/timestamp.proto";
 
 message User {
-  int64                     id                = 1;
+  uint64                    id                = 1;
   string                    email             = 2;
   string                    username          = 3;
   bool                      is_email_verified = 4;
