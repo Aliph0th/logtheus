@@ -59,8 +59,8 @@ func WithUnauthenticated(msg string) *GRPCError {
 	return NewGRPCError(codes.Unauthenticated, msg)
 }
 
-func WithInternal(msg string) *GRPCError {
-	return NewGRPCError(codes.Internal, msg)
+func WithInternal() *GRPCError {
+	return NewGRPCError(codes.Internal, "Internal Server Error")
 }
 
 func WithInternalError(slug, msg string) *GRPCError {

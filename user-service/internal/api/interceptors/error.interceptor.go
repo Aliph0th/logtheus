@@ -34,14 +34,16 @@ func (e *ErrorInterceptor) Unary() grpcLib.UnaryServerInterceptor {
 
 		var grpcErr *grpc.GRPCError
 		if errors.As(err, &grpcErr) {
-			slog.Warn(
-				"gRPC error occurred",
-				"method", info.FullMethod,
-				"code", grpcErr.Code.String(),
-				"message", grpcErr.Message,
-				"slug", grpcErr.Slug,
-				sl.Error(err),
-			)
+			if grpcErr.Code == codes.Internal {
+				slog.Error(
+					"gRPC error occurred",
+					"method", info.FullMethod,
+					"code", grpcErr.Code.String(),
+					"message", grpcErr.Message,
+					"slug", grpcErr.Slug,
+					sl.Error(err),
+				)
+			}
 			return nil, grpcErr.ToGRPCStatus()
 		}
 

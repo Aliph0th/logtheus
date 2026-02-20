@@ -59,7 +59,12 @@ func (h *UserHandler) LoginUser(ctx context.Context, req *userProto.LoginUserReq
 }
 
 func (h *UserHandler) VerifyUserEmail(ctx context.Context, req *userProto.VerifyUserEmailRequest) (*userProto.VerifyUserEmailResponse, error) {
+	//TODO: refresh token!
+	accessToken, _, err := h.userService.VerifyUserEmail(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	return &userProto.VerifyUserEmailResponse{
-		AccessToken: "access_token_placeholder",
+		AccessToken: accessToken,
 	}, nil
 }

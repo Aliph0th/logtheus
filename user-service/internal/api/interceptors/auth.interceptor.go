@@ -36,13 +36,12 @@ func (i *AuthInterceptor) Unary() grpcLib.UnaryServerInterceptor {
 
 		token, err := i.extractTokenFromContext(ctx)
 		if err != nil {
-			// Return proper gRPC status error
-			return nil, grpc.WithUnauthenticated(fmt.Sprintf("authentication failed: %v", err)).ToGRPCStatus()
+			return nil, grpc.WithUnauthenticated(fmt.Sprintf("Authentication failed: %v", err)).ToGRPCStatus()
 		}
 
 		claims, err := i.tokenService.VerifyAccessToken(token)
 		if err != nil {
-			return nil, grpc.WithUnauthenticated("invalid or expired token").ToGRPCStatus()
+			return nil, grpc.WithUnauthenticated("Invalid or expired token").ToGRPCStatus()
 		}
 
 		newCtx := context.WithValue(ctx, consts.AUTH_CONTEXT_KEY, claims)

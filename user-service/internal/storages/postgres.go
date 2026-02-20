@@ -23,7 +23,7 @@ func NewPostgres(cfg *config.AppConfig) (*Database, error) {
 	return &Database{DB: db}, nil
 }
 
-func (d *Database) Migrate(models ...interface{}) error {
+func (d *Database) Migrate(models ...any) error {
 	if err := d.DB.AutoMigrate(models...); err != nil {
 		return fmt.Errorf("Failed to migrate database: %w", err)
 	}
