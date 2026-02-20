@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 	"logtheus/shared/pkg/consts"
-	"logtheus/user/types"
+	"logtheus/user/internal/types"
 )
 
 func MustUserData(c context.Context) *types.UserAuthPayload {

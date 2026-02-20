@@ -8,8 +8,8 @@ import (
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/models"
 	"logtheus/user/internal/repository"
+	"logtheus/user/internal/types"
 	"logtheus/user/internal/utils"
-	"logtheus/user/types"
 
 	"golang.org/x/crypto/bcrypt"
 )

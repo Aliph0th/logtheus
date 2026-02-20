@@ -7,7 +7,7 @@ import (
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/consts"
 	"logtheus/user/internal/repository"
-	"logtheus/user/types"
+	"logtheus/user/internal/types"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
