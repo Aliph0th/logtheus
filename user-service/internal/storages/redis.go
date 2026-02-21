@@ -20,7 +20,12 @@ func NewRedisClient(cfg *config.AppConfig) (*RedisDatabase, error) {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.Database,
 	})
-	var ctx = context.Background()
+
+	ctx := context.Background()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		panic(fmt.Sprintf("Failed to connect to Redis: %v", err))
+	}
+
 	return &RedisDatabase{rdb, ctx}, nil
 }
 

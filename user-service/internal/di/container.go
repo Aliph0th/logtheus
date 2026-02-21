@@ -1,8 +1,10 @@
 package di
 
 import (
+	sharedInterceptors "logtheus/shared/pkg/interceptors"
 	"logtheus/user/internal/api"
 	"logtheus/user/internal/api/interceptors"
+	"logtheus/user/internal/clients"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/repository"
 	service "logtheus/user/internal/services"
@@ -20,6 +22,9 @@ func Build(cfg *config.AppConfig, db *gorm.DB) *dig.Container {
 	_ = c.Provide(func() *gorm.DB { return db })
 	_ = c.Provide(storages.NewRedisClient)
 
+	// gRPC Clients
+	_ = c.Provide(clients.NewMailClient)
+
 	// Repositories
 	_ = c.Provide(repository.NewTokenRepository)
 	_ = c.Provide(repository.NewUserRepository)
@@ -30,7 +35,7 @@ func Build(cfg *config.AppConfig, db *gorm.DB) *dig.Container {
 
 	//Interceptors
 	_ = c.Provide(interceptors.NewAuthInterceptor)
-	_ = c.Provide(interceptors.NewErrorInterceptor)
+	_ = c.Provide(sharedInterceptors.NewErrorInterceptor)
 
 	//handlers
 	_ = c.Provide(api.NewUserHandler)

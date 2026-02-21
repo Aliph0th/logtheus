@@ -2,21 +2,26 @@ package service
 
 import (
 	"context"
+
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
+	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/user/internal/config"
+	userConsts "logtheus/user/internal/consts"
 	"logtheus/user/internal/models"
 	"logtheus/user/internal/repository"
 	"logtheus/user/internal/types"
 	"logtheus/user/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type UserService struct {
 	repo         *repository.UserRepository
 	tokenService *TokenService
+	mailClient   mailProto.MailServiceClient
 	cfg          *config.AppConfig
 }
 
@@ -24,10 +29,12 @@ func NewUserService(
 	repo *repository.UserRepository,
 	tokenService *TokenService,
 	cfg *config.AppConfig,
+	mailClient mailProto.MailServiceClient,
 ) *UserService {
 	return &UserService{
 		repo:         repo,
 		tokenService: tokenService,
+		mailClient:   mailClient,
 		cfg:          cfg,
 	}
 }
@@ -59,11 +66,15 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_USER_CREATE_FAILED)
 	}
 
-	_, err = s.tokenService.IssueEmailVerificationToken(user.ID)
+	token, err := s.tokenService.IssueEmailVerificationToken(user.ID)
 	if err != nil {
 		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_VERIFICATION_TOKEN_ISSUE_FAILED)
 	}
-	//TODO: send verification email with token
+
+	_, err = s.sendVerifyEmailAsync(user.Email, user.Username, token)
+	if err != nil {
+		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_SEND_EMAIL_FAILED)
+	}
 
 	accessToken, refreshToken := s.tokenService.SignAuthTokens(&types.UserAuthPayload{
 		UserID:          user.ID,
@@ -108,4 +119,21 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 	})
 
 	return accessToken, refreshToken, nil
+}
+
+func (s *UserService) sendVerifyEmailAsync(email, username, code string) (*mailProto.SuccessfulResponse, error) {
+	ctx := context.Background()
+
+	req := &mailProto.SendVerifyEmailRequest{
+		Email:      email,
+		Username:   username,
+		Code:       code,
+		Expiration: durationpb.New(userConsts.TTL_VERIFY_TOKEN),
+	}
+
+	response, err := s.mailClient.SendVerifyEmail(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }

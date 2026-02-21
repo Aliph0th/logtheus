@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 
+	sharedInterceptors "logtheus/shared/pkg/interceptors"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/utils"
 	"logtheus/user/internal/api/interceptors"
@@ -21,9 +22,9 @@ func StartGRPCServer(port int, container *dig.Container) error {
 
 	handler := utils.MustResolve[*UserHandler](container)
 	authInterceptor := utils.MustResolve[*interceptors.AuthInterceptor](container)
-	errorInterceptor := utils.MustResolve[*interceptors.ErrorInterceptor](container)
+	errorInterceptor := utils.MustResolve[*sharedInterceptors.ErrorInterceptor](container)
 
-	chainedInterceptor := interceptors.ChainUnaryInterceptor(
+	chainedInterceptor := sharedInterceptors.ChainUnaryInterceptor(
 		authInterceptor.Unary(),
 		errorInterceptor.Unary(),
 	)

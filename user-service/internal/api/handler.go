@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"log/slog"
 
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	service "logtheus/user/internal/services"
@@ -22,7 +21,6 @@ func NewUserHandler(userService *service.UserService) *UserHandler {
 }
 
 func (h *UserHandler) RegisterUser(ctx context.Context, req *userProto.RegisterUserRequest) (*userProto.SuccessAuthUserResponse, error) {
-	slog.Info("RegisterUser called", "email", req.Email)
 	user, accessToken, refreshToken, err := h.userService.CreateUser(req)
 	if err != nil {
 		return nil, err
@@ -31,6 +29,7 @@ func (h *UserHandler) RegisterUser(ctx context.Context, req *userProto.RegisterU
 		User: &userProto.User{
 			Id:              user.ID,
 			Email:           user.Email,
+			Username:        user.Username,
 			IsEmailVerified: user.IsEmailVerified,
 			CreatedAt:       timestamppb.New(user.CreatedAt),
 			UpdatedAt:       timestamppb.New(user.UpdatedAt),

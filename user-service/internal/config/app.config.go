@@ -25,4 +25,8 @@ type AppConfig struct {
 		Port     int    `mapstructure:"REDIS_PORT"`
 		Database int    `mapstructure:"REDIS_DATABASE"`
 	} `mapstructure:",squash"`
+
+	Services struct {
+		Mail string `mapstructure:"MAIL_SERVICE"`
+	} `mapstructure:",squash"`
 }
