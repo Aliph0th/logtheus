@@ -5,6 +5,7 @@ import (
 
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
+	"logtheus/shared/pkg/storages"
 	"logtheus/user/internal/models"
 
 	"gorm.io/gorm"
@@ -14,8 +15,8 @@ type UserRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *storages.Database) *UserRepository {
+	return &UserRepository{db: db.DB}
 }
 
 func (r *UserRepository) Create(user *models.User) error {

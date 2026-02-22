@@ -3,7 +3,8 @@ package storages
 import (
 	"fmt"
 	"log/slog"
-	"logtheus/user/internal/config"
+	sl "logtheus/shared/pkg/utils/logger"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -13,13 +14,14 @@ type Database struct {
 	DB *gorm.DB
 }
 
-func NewPostgres(cfg *config.AppConfig) (*Database, error) {
-	dataSourceName := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", cfg.DB.Host, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.Port)
+func NewPostgres(host string, port int, user string, password string, name string) (*Database, error) {
+	dataSourceName := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, user, password, name, port)
 	db, err := gorm.Open(postgres.Open(dataSourceName), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to Postgres: %w", err)
+		slog.Error("Failed to connect to Postgres", sl.Error(err))
+		os.Exit(1)
 	}
-	slog.Info("Connected to Postgres database", "host", cfg.DB.Host, "port", cfg.DB.Port, "dbname", cfg.DB.Name)
+	slog.Info("Connected to Postgres database", "host", host, "port", port, "dbname", name)
 	return &Database{DB: db}, nil
 }
 

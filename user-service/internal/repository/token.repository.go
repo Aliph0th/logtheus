@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"logtheus/user/internal/storages"
+	"logtheus/shared/pkg/storages"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,8 +12,8 @@ type TokenRepository struct {
 	redis *storages.RedisDatabase
 }
 
-func NewTokenRepository(db *gorm.DB, redis *storages.RedisDatabase) *TokenRepository {
-	return &TokenRepository{db: db, redis: redis}
+func NewTokenRepository(db *storages.Database, redis *storages.RedisDatabase) *TokenRepository {
+	return &TokenRepository{db: db.DB, redis: redis}
 }
 
 func (r *TokenRepository) CreateInRedis(key, token string, ttl time.Duration) error {

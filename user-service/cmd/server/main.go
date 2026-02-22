@@ -4,13 +4,13 @@ import (
 	"log/slog"
 
 	"logtheus/shared/pkg/consts"
+	"logtheus/shared/pkg/storages"
 	"logtheus/shared/pkg/utils"
 	sl "logtheus/shared/pkg/utils/logger"
 	"logtheus/user/internal/api"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/di"
 	"logtheus/user/internal/models"
-	"logtheus/user/internal/storages"
 	"os"
 )
 
@@ -24,18 +24,15 @@ func main() {
 	logger := sl.SetupLogger(cfg.Env)
 	slog.SetDefault(logger)
 
-	db, err := storages.NewPostgres(cfg)
-	if err != nil {
-		slog.Error("Failed to setup database", sl.Error(err))
-		os.Exit(1)
-	}
+	container := di.Build(cfg)
+	db := utils.MustResolve[*storages.Database](container)
 	defer db.Close()
+	redis := utils.MustResolve[*storages.RedisDatabase](container)
+	defer redis.Close()
 
 	if cfg.Env == consts.DEVELOPMENT {
 		db.Migrate(&models.User{})
 	}
-
-	container := di.Build(cfg, db.DB)
 
 	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {
 		slog.Error("Failed to start gRPC server", sl.Error(err))

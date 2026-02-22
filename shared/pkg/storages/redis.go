@@ -3,7 +3,6 @@ package storages
 import (
 	"context"
 	"fmt"
-	"logtheus/user/internal/config"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -14,11 +13,11 @@ type RedisDatabase struct {
 	ctx context.Context
 }
 
-func NewRedisClient(cfg *config.AppConfig) (*RedisDatabase, error) {
+func NewRedisClient(host string, port int, password string, database int) (*RedisDatabase, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.Database,
+		Addr:     fmt.Sprintf("%s:%d", host, port),
+		Password: password,
+		DB:       database,
 	})
 
 	ctx := context.Background()
@@ -43,4 +42,8 @@ func (r *RedisDatabase) Set(key string, value any, ttlSeconds *time.Duration) er
 
 func (r *RedisDatabase) Del(key string) error {
 	return r.rdb.Del(r.ctx, key).Err()
+}
+
+func (r *RedisDatabase) Close() error {
+	return r.rdb.Close()
 }

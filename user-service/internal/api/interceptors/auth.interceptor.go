@@ -28,10 +28,6 @@ func (i *AuthInterceptor) Unary() grpcLib.UnaryServerInterceptor {
 		info *grpcLib.UnaryServerInfo,
 		handler grpcLib.UnaryHandler,
 	) (any, error) {
-		if consts.PUBLIC_METHODS[info.FullMethod] {
-			return handler(ctx, req)
-		}
-
 		userID, isEmailVerified, found := i.extractUserDataFromMetadata(ctx)
 		requestCtx := ctx
 		if found {
