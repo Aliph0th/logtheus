@@ -7,7 +7,7 @@ import (
 	"logtheus/user/internal/clients"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/repository"
-	service "logtheus/user/internal/services"
+	"logtheus/user/internal/services"
 	"logtheus/user/internal/storages"
 
 	"go.uber.org/dig"
@@ -30,8 +30,8 @@ func Build(cfg *config.AppConfig, db *gorm.DB) *dig.Container {
 	_ = c.Provide(repository.NewUserRepository)
 
 	// Services
-	_ = c.Provide(service.NewTokenService)
-	_ = c.Provide(service.NewUserService)
+	_ = c.Provide(services.NewTokenService)
+	_ = c.Provide(services.NewUserService)
 
 	//Interceptors
 	_ = c.Provide(interceptors.NewAuthInterceptor)

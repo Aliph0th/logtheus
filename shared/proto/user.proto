@@ -3,6 +3,7 @@ package logtheus.user.v1;
 option go_package = "logtheus/shared/pkg/pb/v1/user";
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 message User {
   uint64                    id                = 1;
@@ -23,6 +24,21 @@ service UserService {
 
   // Verifies a user's email address.
   rpc VerifyUserEmail (VerifyUserEmailRequest) returns (VerifyUserEmailResponse);
+
+  // Retrieves the authenticated user's information.
+  rpc GetMe (google.protobuf.Empty) returns (User);
+
+  //Validates jwt token and returns user info
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  uint64 user_id           = 1;
+  bool   is_email_verified = 2;
 }
 
 message RegisterUserRequest {

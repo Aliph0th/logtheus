@@ -1,4 +1,4 @@
-package service
+package services
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"logtheus/shared/pkg/grpc"
 	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	userProto "logtheus/shared/pkg/pb/v1/user"
+	"logtheus/shared/pkg/types"
 	"logtheus/user/internal/config"
 	userConsts "logtheus/user/internal/consts"
 	"logtheus/user/internal/models"
 	"logtheus/user/internal/repository"
-	"logtheus/user/internal/types"
 	"logtheus/user/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
@@ -136,4 +136,25 @@ func (s *UserService) sendVerifyEmailAsync(email, username, code string) (*mailP
 		return nil, err
 	}
 	return response, nil
+}
+
+func (s *UserService) ValidateToken(token string) (*types.UserAuthClaims, error) {
+	payload, err := s.tokenService.VerifyAccessToken(token)
+	if err != nil {
+		return nil, grpc.WithInvalidArgument("Invalid token").WithSlug(consts.ERROR_CODE_INVALID_TOKEN)
+	}
+	return payload, nil
+}
+
+func (s *UserService) GetMe(ctx context.Context) (*models.User, error) {
+	auth := utils.MustUserData(ctx)
+	if auth == nil {
+		return nil, grpc.WithInvalidArgument("No authenticated user data").WithSlug(consts.ERROR_CODE_UNAUTHENTICATED)
+	}
+	user, err := s.repo.GetByID(auth.UserID)
+	if err != nil {
+		//TODO: maybe distinguish not found and other errors?
+		return nil, grpc.WithNotFound("User not found").WithSlug(consts.ERROR_CODE_NOT_FOUND)
+	}
+	return user, nil
 }

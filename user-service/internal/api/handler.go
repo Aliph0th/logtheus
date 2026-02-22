@@ -4,17 +4,18 @@ import (
 	"context"
 
 	userProto "logtheus/shared/pkg/pb/v1/user"
-	service "logtheus/user/internal/services"
+	"logtheus/user/internal/services"
 
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserHandler struct {
 	userProto.UnimplementedUserServiceServer
-	userService *service.UserService
+	userService *services.UserService
 }
 
-func NewUserHandler(userService *service.UserService) *UserHandler {
+func NewUserHandler(userService *services.UserService) *UserHandler {
 	return &UserHandler{
 		userService: userService,
 	}
@@ -65,5 +66,31 @@ func (h *UserHandler) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 	}
 	return &userProto.VerifyUserEmailResponse{
 		AccessToken: accessToken,
+	}, nil
+}
+
+func (h *UserHandler) ValidateToken(ctx context.Context, req *userProto.ValidateTokenRequest) (*userProto.ValidateTokenResponse, error) {
+	claims, err := h.userService.ValidateToken(req.Token)
+	if err != nil {
+		return nil, err
+	}
+	return &userProto.ValidateTokenResponse{
+		UserId:          claims.UserID,
+		IsEmailVerified: claims.IsEmailVerified,
+	}, nil
+}
+
+func (h *UserHandler) GetMe(ctx context.Context, req *emptypb.Empty) (*userProto.User, error) {
+	user, err := h.userService.GetMe(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &userProto.User{
+		Id:              user.ID,
+		Email:           user.Email,
+		Username:        user.Username,
+		IsEmailVerified: user.IsEmailVerified,
+		CreatedAt:       timestamppb.New(user.CreatedAt),
+		UpdatedAt:       timestamppb.New(user.UpdatedAt),
 	}, nil
 }

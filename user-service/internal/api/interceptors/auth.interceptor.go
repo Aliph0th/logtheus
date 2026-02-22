@@ -2,22 +2,20 @@ package interceptors
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"logtheus/shared/pkg/grpc"
+	"logtheus/shared/pkg/types"
 	"logtheus/user/internal/consts"
-	service "logtheus/user/internal/services"
-	"strings"
+	"logtheus/user/internal/services"
+	"strconv"
 
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
 type AuthInterceptor struct {
-	tokenService *service.TokenService
+	tokenService *services.TokenService
 }
 
-func NewAuthInterceptor(tokenService *service.TokenService) *AuthInterceptor {
+func NewAuthInterceptor(tokenService *services.TokenService) *AuthInterceptor {
 	return &AuthInterceptor{
 		tokenService: tokenService,
 	}
@@ -34,37 +32,38 @@ func (i *AuthInterceptor) Unary() grpcLib.UnaryServerInterceptor {
 			return handler(ctx, req)
 		}
 
-		token, err := i.extractTokenFromContext(ctx)
-		if err != nil {
-			return nil, grpc.WithUnauthenticated(fmt.Sprintf("Authentication failed: %v", err)).ToGRPCStatus()
+		userID, isEmailVerified, found := i.extractUserDataFromMetadata(ctx)
+		requestCtx := ctx
+		if found {
+			authPayload := &types.UserAuthPayload{
+				UserID:          userID,
+				IsEmailVerified: isEmailVerified,
+			}
+			requestCtx = context.WithValue(requestCtx, consts.AUTH_CONTEXT_KEY, authPayload)
 		}
+		return handler(requestCtx, req)
 
-		claims, err := i.tokenService.VerifyAccessToken(token)
-		if err != nil {
-			return nil, grpc.WithUnauthenticated("Invalid or expired token").ToGRPCStatus()
-		}
-
-		newCtx := context.WithValue(ctx, consts.AUTH_CONTEXT_KEY, claims)
-
-		return handler(newCtx, req)
 	}
 }
 
-func (i *AuthInterceptor) extractTokenFromContext(ctx context.Context) (string, error) {
-	data, ok := metadata.FromIncomingContext(ctx)
+func (i *AuthInterceptor) extractUserDataFromMetadata(ctx context.Context) (uint64, bool, bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", errors.New("missing metadata")
+		return 0, false, false
 	}
 
-	authHeader := data.Get("authorization")
-	if len(authHeader) == 0 {
-		return "", errors.New("missing authorization header")
+	var userID uint64
+	var isEmailVerified bool
+
+	if userIDStr := md.Get("x-user-id"); len(userIDStr) > 0 {
+		if id, err := strconv.ParseUint(userIDStr[0], 10, 64); err == nil {
+			userID = id
+		}
 	}
 
-	parts := strings.SplitN(authHeader[0], " ", 2)
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", errors.New("invalid authorization format: expected 'Bearer <token>'")
+	if emailVerificationStr := md.Get("x-email-verified"); len(emailVerificationStr) > 0 {
+		isEmailVerified = emailVerificationStr[0] == "true"
 	}
 
-	return parts[1], nil
+	return userID, isEmailVerified, userID > 0
 }

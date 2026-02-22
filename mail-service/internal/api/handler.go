@@ -4,16 +4,16 @@ import (
 	"context"
 	"log/slog"
 
-	service "logtheus/mail/internal/services"
+	"logtheus/mail/internal/services"
 	mailProto "logtheus/shared/pkg/pb/v1/mail"
 )
 
 type MailHandler struct {
 	mailProto.UnimplementedMailServiceServer
-	mailService *service.MailService
+	mailService *services.MailService
 }
 
-func NewMailHandler(mailService *service.MailService) *MailHandler {
+func NewMailHandler(mailService *services.MailService) *MailHandler {
 	return &MailHandler{
 		mailService: mailService,
 	}
