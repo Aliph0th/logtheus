@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"logtheus/shared/pkg/consts"
+
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,11 +46,15 @@ func WithInvalidArgument(msg string) *GRPCError {
 }
 
 func WithNotFound(msg string) *GRPCError {
-	return NewGRPCError(codes.NotFound, msg)
+	return NewGRPCError(codes.NotFound, msg).WithSlug(consts.ERROR_CODE_NOT_FOUND)
 }
 
 func WithAlreadyExists(msg string) *GRPCError {
 	return NewGRPCError(codes.AlreadyExists, msg)
+}
+
+func WithResourceExhausted(msg string) *GRPCError {
+	return NewGRPCError(codes.ResourceExhausted, msg)
 }
 
 func WithPermissionDenied(msg string) *GRPCError {
@@ -61,30 +67,4 @@ func WithUnauthenticated(msg string) *GRPCError {
 
 func WithInternal() *GRPCError {
 	return NewGRPCError(codes.Internal, "Internal Server Error")
-}
-
-func WithInternalError(slug, msg string) *GRPCError {
-	return NewGRPCError(codes.Internal, msg).WithSlug(slug)
-}
-
-func GetErrorSlug(err error) string {
-	if grpcErr, ok := err.(*GRPCError); ok {
-		return grpcErr.Slug
-	}
-	return ""
-}
-
-func FormatErrorResponse(err error) map[string]interface{} {
-	if grpcErr, ok := err.(*GRPCError); ok {
-		return map[string]interface{}{
-			"code":    grpcErr.Code.String(),
-			"message": grpcErr.Message,
-			"slug":    grpcErr.Slug,
-		}
-	}
-	return map[string]interface{}{
-		"code":    "UNKNOWN",
-		"message": err.Error(),
-		"slug":    "",
-	}
 }

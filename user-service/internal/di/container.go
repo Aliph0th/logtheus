@@ -1,11 +1,11 @@
 package di
 
 import (
-	sharedInterceptors "logtheus/shared/pkg/interceptors"
+	"logtheus/shared/pkg/clients"
+	"logtheus/shared/pkg/interceptors"
+	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	"logtheus/shared/pkg/storages"
 	"logtheus/user/internal/api"
-	"logtheus/user/internal/api/interceptors"
-	"logtheus/user/internal/clients"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/repository"
 	"logtheus/user/internal/services"
@@ -28,7 +28,9 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	})
 
 	// gRPC Clients
-	_ = c.Provide(clients.NewMailClient)
+	_ = c.Provide(func(cfg *config.AppConfig) mailProto.MailServiceClient {
+		return clients.NewMailClient(cfg.Services.Mail)
+	})
 
 	// Repositories
 	_ = c.Provide(repository.NewTokenRepository)
@@ -40,7 +42,7 @@ func Build(cfg *config.AppConfig) *dig.Container {
 
 	//Interceptors
 	_ = c.Provide(interceptors.NewAuthInterceptor)
-	_ = c.Provide(sharedInterceptors.NewErrorInterceptor)
+	_ = c.Provide(interceptors.NewErrorInterceptor)
 
 	//handlers
 	_ = c.Provide(api.NewUserHandler)

@@ -2,9 +2,8 @@ package interceptors
 
 import (
 	"context"
+	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/types"
-	"logtheus/user/internal/consts"
-	"logtheus/user/internal/services"
 	"strconv"
 
 	grpcLib "google.golang.org/grpc"
@@ -12,13 +11,10 @@ import (
 )
 
 type AuthInterceptor struct {
-	tokenService *services.TokenService
 }
 
-func NewAuthInterceptor(tokenService *services.TokenService) *AuthInterceptor {
-	return &AuthInterceptor{
-		tokenService: tokenService,
-	}
+func NewAuthInterceptor() *AuthInterceptor {
+	return &AuthInterceptor{}
 }
 
 func (i *AuthInterceptor) Unary() grpcLib.UnaryServerInterceptor {

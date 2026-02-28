@@ -5,10 +5,9 @@ import (
 	"log/slog"
 	"net"
 
-	sharedInterceptors "logtheus/shared/pkg/interceptors"
+	"logtheus/shared/pkg/interceptors"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/utils"
-	"logtheus/user/internal/api/interceptors"
 
 	"go.uber.org/dig"
 	"google.golang.org/grpc"
@@ -22,9 +21,9 @@ func StartGRPCServer(port int, container *dig.Container) error {
 
 	handler := utils.MustResolve[*UserHandler](container)
 	authInterceptor := utils.MustResolve[*interceptors.AuthInterceptor](container)
-	errorInterceptor := utils.MustResolve[*sharedInterceptors.ErrorInterceptor](container)
+	errorInterceptor := utils.MustResolve[*interceptors.ErrorInterceptor](container)
 
-	chainedInterceptor := sharedInterceptors.ChainUnaryInterceptor(
+	chainedInterceptor := interceptors.ChainUnaryInterceptor(
 		authInterceptor.Unary(),
 		errorInterceptor.Unary(),
 	)

@@ -8,11 +8,11 @@ import (
 	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/types"
+	"logtheus/shared/pkg/utils"
 	"logtheus/user/internal/config"
 	userConsts "logtheus/user/internal/consts"
 	"logtheus/user/internal/models"
 	"logtheus/user/internal/repository"
-	"logtheus/user/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -154,7 +154,7 @@ func (s *UserService) GetMe(ctx context.Context) (*models.User, error) {
 	user, err := s.repo.GetByID(auth.UserID)
 	if err != nil {
 		//TODO: maybe distinguish not found and other errors?
-		return nil, grpc.WithNotFound("User not found").WithSlug(consts.ERROR_CODE_NOT_FOUND)
+		return nil, grpc.WithNotFound("User not found")
 	}
 	return user, nil
 }

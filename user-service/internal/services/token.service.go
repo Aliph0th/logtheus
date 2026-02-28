@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"logtheus/shared/pkg/types"
-	"logtheus/shared/pkg/utils"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/consts"
 	"logtheus/user/internal/repository"
+	"logtheus/user/internal/utils"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

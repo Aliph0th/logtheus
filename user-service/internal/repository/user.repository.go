@@ -3,7 +3,6 @@ package repository
 import (
 	"errors"
 
-	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	"logtheus/shared/pkg/storages"
 	"logtheus/user/internal/models"
@@ -27,7 +26,7 @@ func (r *UserRepository) GetByID(id uint64) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpc.WithNotFound("User not found").WithSlug(consts.ERROR_CODE_NOT_FOUND)
+			return nil, grpc.WithNotFound("User not found")
 		}
 		return nil, err
 	}
@@ -38,7 +37,7 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "email = ?", email).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpc.WithNotFound("User not found").WithSlug(consts.ERROR_CODE_NOT_FOUND)
+			return nil, grpc.WithNotFound("User not found")
 		}
 		return nil, err
 	}
