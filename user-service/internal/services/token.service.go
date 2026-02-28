@@ -3,6 +3,8 @@ package services
 import (
 	"fmt"
 
+	sharedConsts "logtheus/shared/pkg/consts"
+	"logtheus/shared/pkg/grpc"
 	"logtheus/shared/pkg/types"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/consts"
@@ -71,9 +73,17 @@ func (s *TokenService) UseEmailVerificationToken(userID uint64, token string) er
 	return nil
 }
 
+func (s *TokenService) IssueInviteToken() (string, error) {
+	token, err := s.generateToken(consts.TOKEN_TYPE_INVITE)
+	if err != nil {
+		return "", grpc.WithInternal().WithSlug(sharedConsts.INTERNAL_ERROR_CODE_TOKEN_GENERATION_FAILED)
+	}
+	return token, nil
+}
+
 func (s *TokenService) generateToken(tokenType consts.TokenType) (string, error) {
 	switch tokenType {
-	case consts.TOKEN_TYPE_PASSWORD_RESET:
+	case consts.TOKEN_TYPE_PASSWORD_RESET, consts.TOKEN_TYPE_INVITE:
 		return uuid.NewString(), nil
 	case consts.TOKEN_TYPE_VERIFY:
 		return utils.GenerateCryptoRandomInt(consts.VERIFY_EMAIL_TOKEN_LENGTH)
@@ -87,7 +97,7 @@ func (s *TokenService) verifyJWT(token, secret string) (*types.UserAuthClaims, e
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
 		&claims,
-		func(_ *jwt.Token) (interface{}, error) { return []byte(secret), nil },
+		func(_ *jwt.Token) (any, error) { return []byte(secret), nil },
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithIssuer(s.cfg.JWT.Issuer),
 		jwt.WithExpirationRequired(),

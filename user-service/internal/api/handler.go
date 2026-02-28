@@ -5,19 +5,21 @@ import (
 
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/user/internal/services"
+	"logtheus/user/internal/utils"
 
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserHandler struct {
 	userProto.UnimplementedUserServiceServer
-	userService *services.UserService
+	userService  *services.UserService
+	tokenService *services.TokenService
 }
 
-func NewUserHandler(userService *services.UserService) *UserHandler {
+func NewUserHandler(userService *services.UserService, tokenService *services.TokenService) *UserHandler {
 	return &UserHandler{
-		userService: userService,
+		userService:  userService,
+		tokenService: tokenService,
 	}
 }
 
@@ -27,14 +29,7 @@ func (h *UserHandler) RegisterUser(ctx context.Context, req *userProto.RegisterU
 		return nil, err
 	}
 	return &userProto.SuccessAuthUserResponse{
-		User: &userProto.User{
-			Id:              user.ID,
-			Email:           user.Email,
-			Username:        user.Username,
-			IsEmailVerified: user.IsEmailVerified,
-			CreatedAt:       timestamppb.New(user.CreatedAt),
-			UpdatedAt:       timestamppb.New(user.UpdatedAt),
-		},
+		User:         utils.ToUserProto(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
@@ -46,13 +41,7 @@ func (h *UserHandler) LoginUser(ctx context.Context, req *userProto.LoginUserReq
 		return nil, err
 	}
 	return &userProto.SuccessAuthUserResponse{
-		User: &userProto.User{
-			Id:              user.ID,
-			Email:           user.Email,
-			IsEmailVerified: user.IsEmailVerified,
-			CreatedAt:       timestamppb.New(user.CreatedAt),
-			UpdatedAt:       timestamppb.New(user.UpdatedAt),
-		},
+		User:         utils.ToUserProto(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
@@ -85,12 +74,21 @@ func (h *UserHandler) GetMe(ctx context.Context, req *emptypb.Empty) (*userProto
 	if err != nil {
 		return nil, err
 	}
-	return &userProto.User{
-		Id:              user.ID,
-		Email:           user.Email,
-		Username:        user.Username,
-		IsEmailVerified: user.IsEmailVerified,
-		CreatedAt:       timestamppb.New(user.CreatedAt),
-		UpdatedAt:       timestamppb.New(user.UpdatedAt),
-	}, nil
+	return utils.ToUserProto(user), nil
+}
+
+func (h *UserHandler) GetUser(ctx context.Context, req *userProto.GetUserRequest) (*userProto.User, error) {
+	user, err := h.userService.GetUserByIdentifier(req)
+	if err != nil {
+		return nil, err
+	}
+	return utils.ToUserProto(user), nil
+}
+
+func (h *UserHandler) IssueInviteToken(ctx context.Context, req *emptypb.Empty) (*userProto.InviteTokenResponse, error) {
+	token, err := h.tokenService.IssueInviteToken()
+	if err != nil {
+		return nil, err
+	}
+	return &userProto.InviteTokenResponse{Token: token}, nil
 }

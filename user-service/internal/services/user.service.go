@@ -39,13 +39,6 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) GetUserByID(id uint64) (*models.User, error) {
-	return s.repo.GetByID(id)
-}
-func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
-	return s.repo.GetByEmail(email)
-}
-
 func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.User, string, string, error) {
 	candidate, _ := s.repo.GetByEmail(req.Email)
 	if candidate != nil {
@@ -71,7 +64,7 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_VERIFICATION_TOKEN_ISSUE_FAILED)
 	}
 
-	_, err = s.sendVerifyEmailAsync(user.Email, user.Username, token)
+	_, err = s.sendVerifyEmail(user.Email, user.Username, token)
 	if err != nil {
 		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_SEND_EMAIL_FAILED)
 	}
@@ -121,23 +114,6 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 	return accessToken, refreshToken, nil
 }
 
-func (s *UserService) sendVerifyEmailAsync(email, username, code string) (*mailProto.SuccessfulResponse, error) {
-	ctx := context.Background()
-
-	req := &mailProto.SendVerifyEmailRequest{
-		Email:      email,
-		Username:   username,
-		Code:       code,
-		Expiration: durationpb.New(userConsts.TTL_VERIFY_TOKEN),
-	}
-
-	response, err := s.mailClient.SendVerifyEmail(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
 func (s *UserService) ValidateToken(token string) (*types.UserAuthClaims, error) {
 	payload, err := s.tokenService.VerifyAccessToken(token)
 	if err != nil {
@@ -157,4 +133,31 @@ func (s *UserService) GetMe(ctx context.Context) (*models.User, error) {
 		return nil, grpc.WithNotFound("User not found")
 	}
 	return user, nil
+}
+
+func (s *UserService) sendVerifyEmail(email, username, code string) (*mailProto.SuccessfulResponse, error) {
+	ctx := context.Background()
+
+	req := &mailProto.SendVerifyEmailRequest{
+		Email:      email,
+		Username:   username,
+		Code:       code,
+		Expiration: durationpb.New(userConsts.TTL_VERIFY_TOKEN),
+	}
+
+	response, err := s.mailClient.SendVerifyEmail(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (s *UserService) GetUserByIdentifier(req *userProto.GetUserRequest) (*models.User, error) {
+	switch req.GetIdentifier().(type) {
+	case *userProto.GetUserRequest_UserId:
+		return s.repo.GetByID(req.GetUserId())
+	case *userProto.GetUserRequest_Email:
+		return s.repo.GetByEmail(req.GetEmail())
+	}
+	return nil, grpc.WithInvalidArgument("Invalid identifier type").WithSlug(consts.ERROR_CODE_UNKNOWN)
 }

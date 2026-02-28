@@ -30,6 +30,12 @@ service UserService {
 
   //Validates jwt token and returns user info
   rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Get user by id or email
+  rpc GetUser (GetUserRequest) returns (User);
+
+  // Issues a new invite token
+  rpc IssueInviteToken (google.protobuf.Empty) returns (InviteTokenResponse);
 }
 
 message ValidateTokenRequest {
@@ -64,4 +70,15 @@ message SuccessAuthUserResponse {
 
 message VerifyUserEmailResponse {
   string access_token = 1;
+}
+
+message GetUserRequest {
+  oneof identifier {
+    uint64 user_id = 1;
+    string email = 2;
+  }
+}
+
+message InviteTokenResponse {
+  string token = 1;
 }
