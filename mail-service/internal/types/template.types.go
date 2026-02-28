@@ -8,7 +8,8 @@ type VerifyEmailData struct {
 }
 
 type InviteEmailData struct {
-	InviterName string
+	InviteeName string
+	Referrer    string
 	ProjectName string
 	InviteLink  string
 }

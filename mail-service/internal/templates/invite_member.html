@@ -41,7 +41,11 @@
                               margin: 30px 0 0 0;
                            "
                         >
+                           {{if .InviteeName}}
+                           Hi <strong>{{.InviteeName}}</strong>! You've been invited to join <strong>{{.ProjectName}}</strong>
+                           {{else}}
                            You've been invited to join <strong>{{.ProjectName}}</strong>
+                           {{end}}
                         </h1>
                         <p
                            style="
@@ -51,8 +55,8 @@
                               margin: 24px 0 0 0;
                            "
                         >
-                           <strong>{{.InviterName}}</strong> invited you to collaborate on
-                           a project in Logtheus
+                           <strong>{{.Referrer}}</strong> invited you to collaborate on
+                           a project in Logtheus{{if not .InviteeName}}. To accept this invitation, you'll need to create an account first{{end}}.
                         </p>
                         <div
                            style="
@@ -97,7 +101,7 @@
                                  padding: 14px 32px;
                                  border-radius: 4px;
                               "
-                              >Accept Invitation</a
+                              >{{if .InviteeName}}Accept Invitation{{else}}Sign Up & Accept Invitation{{end}}</a
                            >
                         </div>
                         <p
@@ -132,7 +136,8 @@
                         >
                            © Logtheus. All rights reserved.<br />
                            If you didn't expect this invitation, you can simply ignore
-                           this email.
+                           this email.{{if not .InviteeName}}<br />
+                           Note: You'll need to sign up before accepting the invitation.{{end}}
                         </p>
                      </td>
                   </tr>

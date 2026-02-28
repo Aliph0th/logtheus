@@ -45,9 +45,9 @@ func (s *MailService) SendVerifyEmail(to, username, code string, expiresMinutes 
 	return s.sendMail(to, "Logtheus email verification", body)
 }
 
-func (s *MailService) SendInviteEmail(to, inviterName, projectName, code string) error {
+func (s *MailService) SendInviteEmail(to, inviteeName, referrer, projectName, code string) error {
 	url := fmt.Sprintf("%s/accept-invite/%s", s.domain, code)
-	data := &types.InviteEmailData{InviterName: inviterName, ProjectName: projectName, InviteLink: url}
+	data := &types.InviteEmailData{InviteeName: inviteeName, Referrer: referrer, ProjectName: projectName, InviteLink: url}
 
 	body, err := s.renderTemplate("invite_member.html", data)
 	if err != nil {

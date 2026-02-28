@@ -94,7 +94,7 @@ func (s *InvitesService) sendInviteEmail(inviteeName, inviteeEmail, referrer, pr
 	ctx := context.Background()
 
 	req := &mailProto.SendInviteEmailRequest{
-		InviterName: inviteeName,
+		InviteeName: inviteeName,
 		Referrer:    referrer,
 		ProjectName: projectName,
 		Email:       inviteeEmail,

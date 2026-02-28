@@ -31,7 +31,7 @@ func (h *MailHandler) SendVerifyEmail(ctx context.Context, req *mailProto.SendVe
 
 func (h *MailHandler) SendInviteEmail(ctx context.Context, req *mailProto.SendInviteEmailRequest) (*mailProto.SuccessfulResponse, error) {
 	go func() {
-		err := h.mailService.SendInviteEmail(req.Email, req.InviterName, req.ProjectName, req.Code)
+		err := h.mailService.SendInviteEmail(req.Email, req.InviteeName, req.Referrer, req.ProjectName, req.Code)
 		if err != nil {
 			slog.Error("Failed to send invite email", "email", req.Email, "error", err)
 		}
