@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"logtheus/project/internal/config"
-	"logtheus/project/internal/consts"
 	"logtheus/project/internal/models"
 	"logtheus/project/internal/repository"
-	sharedConsts "logtheus/shared/pkg/consts"
+	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
 	"logtheus/shared/pkg/utils"
+	"time"
 )
 
 type ProjectService struct {
@@ -29,16 +29,30 @@ func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.Cr
 	max := s.cfg.Settings.MaxProjectsPerUser
 	if existingCount >= max {
 		err := grpc.WithResourceExhausted(fmt.Sprintf("Project limit of %d per user reached", max))
-		return nil, 0, err.WithSlug(sharedConsts.ERROR_CODE_TOO_MANY_PROJECTS)
+		return nil, 0, err.WithSlug(consts.ERROR_CODE_TOO_MANY_PROJECTS)
 	}
 	project := &models.Project{
 		Name:        dto.Name,
 		Description: &dto.Description,
+		OwnerID:     auth.UserID,
 	}
 	err := s.repo.Create(project)
 	if err != nil {
 		return nil, 0, err
 	}
+
+	now := time.Now()
+	member := &models.ProjectMember{
+		ProjectID: project.ID,
+		UserID:    auth.UserID,
+		Role:      consts.PROJECT_ROLE_OWNER,
+		JoinedAt:  &now,
+	}
+	err = s.repo.AddMember(member)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	return project, max, nil
 }
 

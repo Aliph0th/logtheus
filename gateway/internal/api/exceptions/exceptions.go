@@ -63,9 +63,11 @@ func RespondError(ctx *gin.Context, err error) {
 			Message: st.Message(),
 		}
 
-		detail := st.Details()[0]
-		if errInfo, ok := detail.(*errdetails.ErrorInfo); ok {
-			appErr.Code = errInfo.Reason
+		details := st.Details()
+		if len(details) > 0 {
+			if errInfo, ok := details[0].(*errdetails.ErrorInfo); ok {
+				appErr.Code = errInfo.Reason
+			}
 		}
 
 		ctx.AbortWithStatusJSON(appErr.Status, gin.H{

@@ -63,11 +63,11 @@ func (s *TokenService) UseEmailVerificationToken(userID uint64, token string) er
 		return err
 	}
 	if storedToken == "" {
-		return fmt.Errorf("Verification token not found or expired")
+		return grpc.WithInvalidArgument("Verification token not found or expired").WithSlug(sharedConsts.ERROR_CODE_NOT_FOUND)
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(storedToken), []byte(token))
 	if err != nil {
-		return fmt.Errorf("Invalid verification token")
+		return grpc.WithInvalidArgument("Invalid verification token").WithSlug(sharedConsts.ERROR_CODE_INVALID_TOKEN)
 	}
 	s.repo.DeleteFromRedis(key)
 	return nil
@@ -76,7 +76,7 @@ func (s *TokenService) UseEmailVerificationToken(userID uint64, token string) er
 func (s *TokenService) IssueInviteToken() (string, error) {
 	token, err := s.generateToken(consts.TOKEN_TYPE_INVITE)
 	if err != nil {
-		return "", grpc.WithInternal().WithSlug(sharedConsts.INTERNAL_ERROR_CODE_TOKEN_GENERATION_FAILED)
+		return "", grpc.WithInternal(err).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_TOKEN_GENERATION_FAILED)
 	}
 	return token, nil
 }

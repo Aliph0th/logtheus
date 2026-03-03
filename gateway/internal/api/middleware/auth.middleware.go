@@ -35,7 +35,7 @@ func AuthMiddleware(allowNotVerifiedEmail bool, userClient userProto.UserService
 		}
 		claims, err := userClient.ValidateToken(context.Background(), &userProto.ValidateTokenRequest{Token: token})
 		if err != nil {
-			excepts.RespondError(ctx, excepts.WithUnauthorized(err.Error()).WithCode(sharedConsts.ERROR_CODE_UNAUTHENTICATED))
+			excepts.RespondError(ctx, err)
 			return
 		}
 		payload := &types.UserAuthPayload{

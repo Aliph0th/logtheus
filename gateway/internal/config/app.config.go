@@ -7,6 +7,7 @@ type AppConfig struct {
 	} `mapstructure:",squash"`
 
 	Services struct {
-		User string `mapstructure:"USER_SERVICE"`
+		User    string `mapstructure:"USER_SERVICE"`
+		Project string `mapstructure:"PROJECT_SERVICE"`
 	} `mapstructure:",squash"`
 }

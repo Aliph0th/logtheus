@@ -37,9 +37,9 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{
-		"user":         response.User,
-		"accessToken":  response.AccessToken,
-		"refreshToken": response.RefreshToken,
+		"user":          utils.FromGrpcToDTO(response.User, &dto.UserDTO{}),
+		"access_token":  response.AccessToken,
+		"refresh_token": response.RefreshToken,
 	})
 }
 
@@ -54,7 +54,7 @@ func (c *UserController) VerifyEmail(ctx *gin.Context) {
 		excepts.RespondError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"accessToken": response.AccessToken})
+	ctx.JSON(http.StatusOK, gin.H{"access_token": response.AccessToken})
 }
 
 func (c *UserController) Login(ctx *gin.Context) {
@@ -70,9 +70,9 @@ func (c *UserController) Login(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
-		"user":         response.User,
-		"accessToken":  response.AccessToken,
-		"refreshToken": response.RefreshToken,
+		"user":          utils.FromGrpcToDTO(response.User, &dto.UserDTO{}),
+		"access_token":  response.AccessToken,
+		"refresh_token": response.RefreshToken,
 	})
 }
 
@@ -84,6 +84,6 @@ func (c *UserController) GetCurrentUser(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
-		"user": response,
+		"user": utils.FromGrpcToDTO(response, &dto.UserDTO{}),
 	})
 }

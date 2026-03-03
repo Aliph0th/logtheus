@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
@@ -47,7 +48,7 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_PASSWORD_HASH_FAILED)
+		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_PASSWORD_HASH_FAILED)
 	}
 
 	user := &models.User{
@@ -56,17 +57,17 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 		Password: string(passwordHash),
 	}
 	if err := s.repo.Create(user); err != nil {
-		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_USER_CREATE_FAILED)
+		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_CREATE_FAILED)
 	}
 
 	token, err := s.tokenService.IssueEmailVerificationToken(user.ID)
 	if err != nil {
-		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_VERIFICATION_TOKEN_ISSUE_FAILED)
+		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_VERIFICATION_TOKEN_ISSUE_FAILED)
 	}
 
 	_, err = s.sendVerifyEmail(user.Email, user.Username, token)
 	if err != nil {
-		return nil, "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_SEND_EMAIL_FAILED)
+		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_SEND_EMAIL_FAILED)
 	}
 
 	accessToken, refreshToken := s.tokenService.SignAuthTokens(&types.UserAuthPayload{
@@ -99,11 +100,15 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 	}
 	err := s.tokenService.UseEmailVerificationToken(auth.UserID, req.Code)
 	if err != nil {
-		return "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
+		var grpcErr *grpc.GRPCError
+		if errors.As(err, &grpcErr) {
+			return "", "", grpcErr
+		}
+		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
 	}
 
 	if err := s.repo.VerifyEmail(auth.UserID); err != nil {
-		return "", "", grpc.WithInternal().WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
+		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
 	}
 
 	accessToken, refreshToken := s.tokenService.SignAuthTokens(&types.UserAuthPayload{
@@ -117,7 +122,7 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 func (s *UserService) ValidateToken(token string) (*types.UserAuthClaims, error) {
 	payload, err := s.tokenService.VerifyAccessToken(token)
 	if err != nil {
-		return nil, grpc.WithInvalidArgument("Invalid token").WithSlug(consts.ERROR_CODE_INVALID_TOKEN)
+		return nil, grpc.WithUnauthenticated("Invalid token").WithSlug(consts.ERROR_CODE_UNAUTHENTICATED)
 	}
 	return payload, nil
 }

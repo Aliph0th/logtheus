@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"logtheus/project/internal/config"
-	"logtheus/project/internal/consts"
 	"logtheus/project/internal/repository"
-	sharedConsts "logtheus/shared/pkg/consts"
+	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
@@ -64,7 +63,7 @@ func (s *InvitesService) CreateInvite(ctx context.Context, req *projectProto.Inv
 	maxMembers := s.cfg.Settings.MaxMembersPerProject
 	if count >= maxMembers {
 		err := grpc.WithResourceExhausted(fmt.Sprintf("Project '%s' has reached the maximum number of %d members", project.Name, maxMembers))
-		return err.WithSlug(sharedConsts.ERROR_CODE_TOO_MANY_MEMBERS)
+		return err.WithSlug(consts.ERROR_CODE_TOO_MANY_MEMBERS)
 	}
 
 	invitee, err := s.userClient.GetUser(grpcCtx, &userProto.GetUserRequest{

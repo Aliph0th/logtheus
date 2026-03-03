@@ -60,7 +60,7 @@ func (h *ProjectHandler) GetMyProjects(ctx context.Context, req *emptypb.Empty) 
 	}, nil
 }
 
-func (h *ProjectHandler) GetProjectByID(ctx context.Context, req *projectProto.GetProjectByIdRequest) (*projectProto.Project, error) {
+func (h *ProjectHandler) GetProjectById(ctx context.Context, req *projectProto.GetProjectByIdRequest) (*projectProto.Project, error) {
 	project, err := h.projectService.GetProjectByID(ctx, req.ProjectId)
 	if err != nil {
 		return nil, err

@@ -12,6 +12,7 @@ type GRPCError struct {
 	Code    codes.Code
 	Message string
 	Slug    string
+	Err     error
 }
 
 func NewGRPCError(code codes.Code, message string) *GRPCError {
@@ -19,6 +20,9 @@ func NewGRPCError(code codes.Code, message string) *GRPCError {
 }
 
 func (e *GRPCError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
 	if e.Message != "" {
 		return e.Message
 	}
@@ -27,6 +31,11 @@ func (e *GRPCError) Error() string {
 
 func (e *GRPCError) WithSlug(slug string) *GRPCError {
 	e.Slug = slug
+	return e
+}
+
+func (e *GRPCError) WithError(err error) *GRPCError {
+	e.Err = err
 	return e
 }
 
@@ -65,6 +74,6 @@ func WithUnauthenticated(msg string) *GRPCError {
 	return NewGRPCError(codes.Unauthenticated, msg)
 }
 
-func WithInternal() *GRPCError {
-	return NewGRPCError(codes.Internal, "Internal Server Error")
+func WithInternal(err error) *GRPCError {
+	return NewGRPCError(codes.Internal, "Internal Server Error").WithError(err)
 }

@@ -58,7 +58,7 @@ message InviteUserResponse {
 }
 
 enum Role {
-  VIEWER = 0;
-  EDITOR = 1;
-  ADMIN  = 2;
+  OWNER  = 0;
+  MEMBER = 1;
+  VIEWER = 2;
 }

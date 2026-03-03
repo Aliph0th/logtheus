@@ -2,8 +2,8 @@ package repository
 
 import (
 	"errors"
-	"logtheus/project/internal/consts"
 	"logtheus/project/internal/models"
+	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	"logtheus/shared/pkg/storages"
 
@@ -66,4 +66,8 @@ func (r *ProjectRepository) GetMemberRole(userID, projectID uint64) (*consts.Pro
 		return nil, err
 	}
 	return &member.Role, nil
+}
+
+func (r *ProjectRepository) AddMember(member *models.ProjectMember) error {
+	return r.db.Create(member).Error
 }
