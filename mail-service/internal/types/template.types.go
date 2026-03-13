@@ -12,4 +12,5 @@ type InviteEmailData struct {
 	Referrer    string
 	ProjectName string
 	InviteLink  string
+	ExpiresIn   uint8
 }

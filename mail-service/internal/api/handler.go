@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"logtheus/mail/internal/services"
 	mailProto "logtheus/shared/pkg/pb/v1/mail"
@@ -31,7 +32,9 @@ func (h *MailHandler) SendVerifyEmail(ctx context.Context, req *mailProto.SendVe
 
 func (h *MailHandler) SendInviteEmail(ctx context.Context, req *mailProto.SendInviteEmailRequest) (*mailProto.SuccessfulResponse, error) {
 	go func() {
-		err := h.mailService.SendInviteEmail(req.Email, req.InviteeName, req.Referrer, req.ProjectName, req.Code)
+		duration := time.Until(req.Expiration.AsTime())
+		expiresMinutes := uint8(duration.Minutes())
+		err := h.mailService.SendInviteEmail(req.Email, req.InviteeName, req.Referrer, req.ProjectName, req.Code, expiresMinutes)
 		if err != nil {
 			slog.Error("Failed to send invite email", "email", req.Email, "error", err)
 		}

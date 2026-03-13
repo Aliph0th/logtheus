@@ -14,18 +14,23 @@ import (
 )
 
 type ProjectService struct {
-	repo *repository.ProjectRepository
-	cfg  *config.AppConfig
+	projectRepo *repository.ProjectRepository
+	memberRepo  *repository.MemberRepository
+	cfg         *config.AppConfig
 }
 
-func NewProjectService(repo *repository.ProjectRepository, cfg *config.AppConfig) *ProjectService {
-	return &ProjectService{repo, cfg}
+func NewProjectService(
+	projectRepo *repository.ProjectRepository,
+	memberRepo *repository.MemberRepository,
+	cfg *config.AppConfig,
+) *ProjectService {
+	return &ProjectService{projectRepo, memberRepo, cfg}
 }
 
 func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.CreateProjectRequest) (*models.Project, uint8, error) {
 	auth := utils.MustUserData(ctx)
 
-	existingCount, _ := s.repo.CountUserProjects(auth.UserID)
+	existingCount, _ := s.projectRepo.CountUserProjects(auth.UserID)
 	max := s.cfg.Settings.MaxProjectsPerUser
 	if existingCount >= max {
 		err := grpc.WithResourceExhausted(fmt.Sprintf("Project limit of %d per user reached", max))
@@ -36,7 +41,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.Cr
 		Description: &dto.Description,
 		OwnerID:     auth.UserID,
 	}
-	err := s.repo.Create(project)
+	err := s.projectRepo.Create(project)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -48,7 +53,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.Cr
 		Role:      consts.PROJECT_ROLE_OWNER,
 		JoinedAt:  &now,
 	}
-	err = s.repo.AddMember(member)
+	err = s.memberRepo.AddMember(member)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -59,7 +64,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.Cr
 func (s *ProjectService) GetMyProjects(ctx context.Context) ([]*models.Project, uint8, error) {
 	auth := utils.MustUserData(ctx)
 
-	projects, err := s.repo.GetByUserID(auth.UserID)
+	projects, err := s.projectRepo.GetByUserID(auth.UserID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -68,7 +73,7 @@ func (s *ProjectService) GetMyProjects(ctx context.Context) ([]*models.Project, 
 
 func (s *ProjectService) GetProjectByID(ctx context.Context, id uint64) (*models.Project, error) {
 	auth := utils.MustUserData(ctx)
-	project, err := s.repo.GetByID(id)
+	project, err := s.projectRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -79,18 +84,18 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, id uint64) (*models
 }
 
 func (s *ProjectService) GetMemberRole(userID, projectID uint64) (*consts.ProjectRole, error) {
-	return s.repo.GetMemberRole(userID, projectID)
+	return s.memberRepo.GetMemberRole(userID, projectID)
 }
 
 func (s *ProjectService) IsMember(userID, projectID uint64) bool {
-	role, _ := s.repo.GetMemberRole(userID, projectID)
+	role, _ := s.memberRepo.GetMemberRole(userID, projectID)
 	return role != nil
 }
 
 func (s *ProjectService) CountMembers(projectID uint64) (uint8, error) {
-	return s.repo.CountProjectMembers(projectID)
+	return s.memberRepo.CountProjectMembers(projectID)
 }
 
 func (s *ProjectService) getByID(id uint64) (*models.Project, error) {
-	return s.repo.GetByID(id)
+	return s.projectRepo.GetByID(id)
 }

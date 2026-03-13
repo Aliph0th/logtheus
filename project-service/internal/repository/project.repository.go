@@ -3,7 +3,6 @@ package repository
 import (
 	"errors"
 	"logtheus/project/internal/models"
-	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	"logtheus/shared/pkg/storages"
 
@@ -41,33 +40,10 @@ func (r *ProjectRepository) CountUserProjects(userID uint64) (uint8, error) {
 	return uint8(count), nil
 }
 
-func (r *ProjectRepository) CountProjectMembers(projectID uint64) (uint8, error) {
-	var count int64
-	if err := r.db.Model(&models.ProjectMember{}).Where("project_id = ?", projectID).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return uint8(count), nil
-}
-
 func (r *ProjectRepository) GetByUserID(userID uint64) ([]*models.Project, error) {
 	var projects []*models.Project
 	if err := r.db.Where("owner_id = ?", userID).Find(&projects).Error; err != nil {
 		return nil, err
 	}
 	return projects, nil
-}
-
-func (r *ProjectRepository) GetMemberRole(userID, projectID uint64) (*consts.ProjectRole, error) {
-	var member models.ProjectMember
-	if err := r.db.First(&member, "user_id = ? AND project_id = ? AND joined_at IS NOT NULL", userID, projectID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &member.Role, nil
-}
-
-func (r *ProjectRepository) AddMember(member *models.ProjectMember) error {
-	return r.db.Create(member).Error
 }

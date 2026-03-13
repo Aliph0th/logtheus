@@ -29,7 +29,7 @@ func main() {
 	defer db.Close()
 
 	if cfg.Env == consts.DEVELOPMENT {
-		db.Migrate(&models.Project{}, &models.ProjectMember{})
+		db.Migrate(&models.Project{}, &models.ProjectMember{}, &models.InviteToken{})
 	}
 
 	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {

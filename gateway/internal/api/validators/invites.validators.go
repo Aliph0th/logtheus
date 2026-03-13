@@ -16,7 +16,7 @@ var availableRoles = []string{
 }
 
 var CreateInviteValidators = []gin.HandlerFunc{
-	gv.NewBody("projectID", func(_, _, _ string) string {
+	gv.NewBody("project_id", func(_, _, _ string) string {
 		return "Project ID must be a valid number"
 	}).Chain().Not().Empty(&vgo.IsEmptyOpts{IgnoreWhitespace: true}).Bail().Numeric(&vgo.IsNumericOpts{NoSymbols: true}).Validate(),
 
@@ -27,6 +27,10 @@ var CreateInviteValidators = []gin.HandlerFunc{
 	gv.NewBody("role", func(_, _, _ string) string {
 		return fmt.Sprintf("Role must be one of the following: %v", availableRoles)
 	}).Chain().Not().Empty(&vgo.IsEmptyOpts{IgnoreWhitespace: true}).Bail().In(availableRoles).Validate(),
+
+	gv.NewBody("expires_at", func(_, _, _ string) string {
+		return "Expiration date must be a valid ISO 8601 date string"
+	}).Chain().Optional().ISO8601(&vgo.IsISO8601Opts{}).Validate(),
 
 	middleware.ValidationMiddleware,
 }

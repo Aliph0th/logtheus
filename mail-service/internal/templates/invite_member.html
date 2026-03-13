@@ -41,10 +41,10 @@
                               margin: 30px 0 0 0;
                            "
                         >
-                           {{if .InviteeName}}
-                           Hi <strong>{{.InviteeName}}</strong>! You've been invited to join <strong>{{.ProjectName}}</strong>
-                           {{else}}
-                           You've been invited to join <strong>{{.ProjectName}}</strong>
+                           {{if .InviteeName}} Hi <strong>{{.InviteeName}}</strong>!
+                           You've been invited to join
+                           <strong>{{.ProjectName}}</strong> {{else}} You've been invited
+                           to join <strong>{{.ProjectName}}</strong>
                            {{end}}
                         </h1>
                         <p
@@ -55,9 +55,25 @@
                               margin: 24px 0 0 0;
                            "
                         >
-                           <strong>{{.Referrer}}</strong> invited you to collaborate on
-                           a project in Logtheus{{if not .InviteeName}}. To accept this invitation, you'll need to create an account first{{end}}.
+                           <strong>{{.Referrer}}</strong> invited you to collaborate on a
+                           project in Logtheus{{if not .InviteeName}}. To accept this
+                           invitation, you'll need to create an account first using the
+                           same email address{{end}}.
                         </p>
+                        {{if .ExpiresIn}}
+                        <p
+                           style="
+                              color: #ff6b6b;
+                              font-size: 13px;
+                              line-height: 20px;
+                              margin: 12px 0 0 0;
+                              font-weight: 500;
+                           "
+                        >
+                           This invitation expires in {{.ExpiresIn}} minute{{if ne
+                           .ExpiresIn 1}}s{{end}}
+                        </p>
+                        {{end}}
                         <div
                            style="
                               background-color: #f5f5f5;
@@ -101,7 +117,8 @@
                                  padding: 14px 32px;
                                  border-radius: 4px;
                               "
-                              >{{if .InviteeName}}Accept Invitation{{else}}Sign Up & Accept Invitation{{end}}</a
+                              >{{if .InviteeName}}Accept Invitation{{else}}Sign Up &
+                              Accept Invitation{{end}}</a
                            >
                         </div>
                         <p
@@ -137,7 +154,8 @@
                            © Logtheus. All rights reserved.<br />
                            If you didn't expect this invitation, you can simply ignore
                            this email.{{if not .InviteeName}}<br />
-                           Note: You'll need to sign up before accepting the invitation.{{end}}
+                           Note: You'll need to sign up before accepting the
+                           invitation.{{end}}
                         </p>
                      </td>
                   </tr>

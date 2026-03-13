@@ -38,7 +38,7 @@ func Build(cfg *config.AppConfig) *dig.Container {
 
 	//Repositories
 	_ = c.Provide(repository.NewProjectRepository)
-	_ = c.Provide(repository.NewInvitesRepository)
+	_ = c.Provide(repository.NewMemberRepository)
 
 	//Services
 	_ = c.Provide(services.NewProjectService)

@@ -51,6 +51,8 @@ message InviteUserRequest {
   uint64 project_id = 1;
   string email      = 2;
   Role   role       = 3;
+
+  optional google.protobuf.Timestamp expires_at = 4;
 }
 
 message InviteUserResponse {

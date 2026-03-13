@@ -17,3 +17,16 @@ func HttpRoleToGRPCRole(httpRole consts.ProjectRole) projectProto.Role {
 		return projectProto.Role_VIEWER
 	}
 }
+
+func GRPCRoleToHttpRole(grpcRole projectProto.Role) consts.ProjectRole {
+	switch grpcRole {
+	case projectProto.Role_OWNER:
+		return consts.PROJECT_ROLE_OWNER
+	case projectProto.Role_MEMBER:
+		return consts.PROJECT_ROLE_MEMBER
+	case projectProto.Role_VIEWER:
+		return consts.PROJECT_ROLE_VIEWER
+	default:
+		return consts.PROJECT_ROLE_VIEWER
+	}
+}
