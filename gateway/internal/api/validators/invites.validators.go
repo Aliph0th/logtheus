@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"logtheus/gateway/internal/api/middleware"
 	"logtheus/shared/pkg/consts"
+	"net/http"
+	"time"
 
 	gv "github.com/bube054/ginvalidator"
 	vgo "github.com/bube054/validatorgo"
@@ -28,9 +30,18 @@ var CreateInviteValidators = []gin.HandlerFunc{
 		return fmt.Sprintf("Role must be one of the following: %v", availableRoles)
 	}).Chain().Not().Empty(&vgo.IsEmptyOpts{IgnoreWhitespace: true}).Bail().In(availableRoles).Validate(),
 
-	gv.NewBody("expires_at", func(_, _, _ string) string {
+	gv.NewBody("expires_at", func(_, _, validatorName string) string {
+		if validatorName == "CustomValidator" {
+			return "Expiration date cannot be in the past"
+		}
 		return "Expiration date must be a valid ISO 8601 date string"
-	}).Chain().Optional().ISO8601(&vgo.IsISO8601Opts{}).Validate(),
+	}).Chain().Optional().ISO8601(&vgo.IsISO8601Opts{}).CustomValidator(func(r *http.Request, initialValue, sanitizedValue string) bool {
+		timeValue, err := time.Parse(time.RFC3339, sanitizedValue)
+		if err != nil {
+			return false
+		}
+		return !timeValue.Before(time.Now())
+	}).Validate(),
 
 	middleware.ValidationMiddleware,
 }
