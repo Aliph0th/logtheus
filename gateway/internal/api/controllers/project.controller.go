@@ -64,3 +64,40 @@ func (c *ProjectController) GetProjectByID(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, gin.H{"project": utils.FromGrpcToDTO(project, &dto.ProjectDTO{})})
 }
+
+func (c *ProjectController) UpdateProject(ctx *gin.Context) {
+	id, _ := strconv.ParseUint(ctx.Param("id"), 10, 64)
+	data := utils.MustDTO[*dto.ProjectUpdateRequest](ctx)
+
+	if data.Name == nil && data.Description == nil {
+		excepts.RespondError(ctx, excepts.WithBadRequest("At least one field (name or description) must be provided"))
+		return
+	}
+
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	project, err := c.projectClient.UpdateProject(grpcCtx, &projectProto.UpdateProjectRequest{
+		ProjectId:   id,
+		Name:        data.Name,
+		Description: data.Description,
+	})
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"project": utils.FromGrpcToDTO(project, &dto.ProjectDTO{})})
+}
+
+func (c *ProjectController) DeleteProject(ctx *gin.Context) {
+	id, _ := strconv.ParseUint(ctx.Param("id"), 10, 64)
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+
+	_, err := c.projectClient.DeleteProject(grpcCtx, &projectProto.DeleteProjectRequest{ProjectId: id})
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"ok": true})
+
+}

@@ -47,3 +47,11 @@ func (r *ProjectRepository) GetByUserID(userID uint64) ([]*models.Project, error
 	}
 	return projects, nil
 }
+
+func (r *ProjectRepository) Update(project *models.Project) error {
+	return r.db.Save(project).Error
+}
+
+func (r *ProjectRepository) Delete(id uint64) error {
+	return r.db.Delete(&models.Project{}, "id = ?", id).Error
+}

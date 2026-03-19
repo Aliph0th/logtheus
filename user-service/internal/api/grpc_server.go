@@ -33,7 +33,7 @@ func StartGRPCServer(port int, container *dig.Container) error {
 	)
 	userProto.RegisterUserServiceServer(grpcServer, handler)
 
-	slog.Info("[USER_SERVICE] gRPC server starting", "port", port)
+	slog.Info("gRPC server starting", "port", port)
 	if err := grpcServer.Serve(listener); err != nil {
 		return fmt.Errorf("failed to serve gRPC: %w", err)
 	}

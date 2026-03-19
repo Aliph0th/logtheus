@@ -25,9 +25,19 @@ func RegisterProjectRoutes(api *gin.RouterGroup, container *dig.Container) {
 			controller.CreateProject,
 		)...)
 
+		projects.PATCH("/:id", append(
+			[]gin.HandlerFunc{validators.DatabaseID("id")},
+			append(
+				validators.UpdateProjectValidators,
+				middleware.BindDTO[*dto.ProjectUpdateRequest](),
+				controller.UpdateProject,
+			)...,
+		)...)
+
+		projects.DELETE("/:id", validators.DatabaseID("id"), controller.DeleteProject)
+
 		projects.GET("/my", controller.GetMyProjects)
-		projects.GET(":id", validators.DatabaseID("id"), controller.GetProjectByID)
-		// projects.PUT(":id")
+		projects.GET("/:id", validators.DatabaseID("id"), controller.GetProjectByID)
 
 		RegisterInvitesRoutes(projects, container)
 	}

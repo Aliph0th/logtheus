@@ -5,6 +5,7 @@ import (
 	"logtheus/gateway/internal/api/middleware"
 	"logtheus/gateway/internal/config"
 	"logtheus/shared/pkg/clients"
+	applicationProto "logtheus/shared/pkg/pb/v1/application"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 
@@ -25,10 +26,14 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	_ = c.Provide(func(cfg *config.AppConfig) projectProto.ProjectServiceClient {
 		return clients.NewProjectClient(cfg.Services.Project)
 	})
+	_ = c.Provide(func(cfg *config.AppConfig) applicationProto.ApplicationServiceClient {
+		return clients.NewApplicationClient(cfg.Services.Application)
+	})
 
 	//Controllers
 	_ = c.Provide(controllers.NewUserController)
 	_ = c.Provide(controllers.NewProjectController)
+	_ = c.Provide(controllers.NewApplicationController)
 	_ = c.Provide(controllers.NewInvitesController)
 
 	// Middlewares

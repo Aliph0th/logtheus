@@ -23,7 +23,7 @@ func StartGRPCServer(port int, container *dig.Container) error {
 	grpcServer := grpc.NewServer()
 	mailProto.RegisterMailServiceServer(grpcServer, handler)
 
-	slog.Info("[MAIL_SERVICE] gRPC server starting", "port", port)
+	slog.Info("gRPC server starting", "port", port)
 	if err := grpcServer.Serve(listener); err != nil {
 		return fmt.Errorf("failed to serve gRPC: %w", err)
 	}

@@ -13,9 +13,11 @@ import (
 
 func RegisterInvitesRoutes(api *gin.RouterGroup, container *dig.Container) {
 	controller := utils.MustResolve[*controllers.InviteController](container)
+	authMiddleware := utils.MustResolve[gin.HandlerFunc](container)
 
 	invites := api.Group("/invites")
 	{
+		invites.Use(authMiddleware)
 		invites.POST("/", append(
 			validators.CreateInviteValidators,
 			middleware.BindDTO[*dto.InviteCreateRequest](),

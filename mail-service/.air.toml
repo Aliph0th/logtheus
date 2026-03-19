@@ -9,7 +9,7 @@ tmp_dir = "tmp"
   args_bin = []
   bin = "./tmp/main.exe"
   cmd = "go build -o ./tmp/main.exe ./cmd/server/main.go"
-  delay = 1000
+  delay = 800
   entrypoint = ["./tmp/main.exe"]
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]
   exclude_file = []
@@ -30,7 +30,7 @@ tmp_dir = "tmp"
   watcher = "cyan"
 
 [log]
-  main_only = false
+  main_only = true
   silent = false
   time = false
 

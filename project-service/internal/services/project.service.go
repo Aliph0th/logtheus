@@ -96,6 +96,44 @@ func (s *ProjectService) CountMembers(projectID uint64) (uint8, error) {
 	return s.memberRepo.CountProjectMembers(projectID)
 }
 
+func (s *ProjectService) UpdateProject(ctx context.Context, dto *projectProto.UpdateProjectRequest) (*models.Project, error) {
+	auth := utils.MustUserData(ctx)
+
+	project, err := s.projectRepo.GetByID(dto.ProjectId)
+	if err != nil {
+		return nil, err
+	}
+	if project.OwnerID != auth.UserID {
+		return nil, grpc.WithPermissionDenied("Only project owner can update this project")
+	}
+
+	if dto.Name != nil {
+		project.Name = *dto.Name
+	}
+	if dto.Description != nil {
+		project.Description = dto.Description
+	}
+
+	if err := s.projectRepo.Update(project); err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func (s *ProjectService) DeleteProject(ctx context.Context, projectID uint64) error {
+	auth := utils.MustUserData(ctx)
+
+	project, err := s.projectRepo.GetByID(projectID)
+	if err != nil {
+		return err
+	}
+	if project.OwnerID != auth.UserID {
+		return grpc.WithPermissionDenied("Only project owner can delete this project")
+	}
+
+	return s.projectRepo.Delete(projectID)
+}
+
 func (s *ProjectService) getByID(id uint64) (*models.Project, error) {
 	return s.projectRepo.GetByID(id)
 }

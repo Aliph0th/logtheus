@@ -25,7 +25,38 @@ var CreateProjectValidators = []gin.HandlerFunc{
 		Max: &consts.MAX_PROJECT_NAME_LEN,
 	}).Validate(),
 	gv.NewBody("description", func(_, _, _ string) string {
-		return "Description must be at most 500 characters long"
+		return fmt.Sprintf(
+			"Description must be between %d and %d characters long",
+			consts.MIN_PROJECT_DESCRIPTION_LEN,
+			consts.MAX_PROJECT_DESCRIPTION_LEN,
+		)
+	}).Chain().Optional().Length(&vgo.IsLengthOpts{
+		Min: consts.MIN_PROJECT_DESCRIPTION_LEN,
+		Max: &consts.MAX_PROJECT_DESCRIPTION_LEN,
+	}).Validate(),
+	middleware.ValidationMiddleware,
+}
+
+var UpdateProjectValidators = []gin.HandlerFunc{
+	gv.NewBody(
+		"name",
+		func(_, _, _ string) string {
+			return fmt.Sprintf(
+				"Project name must be between %d and %d characters",
+				consts.MIN_PROJECT_NAME_LEN,
+				consts.MAX_PROJECT_NAME_LEN,
+			)
+		},
+	).Chain().Optional().Length(&vgo.IsLengthOpts{
+		Min: consts.MIN_PROJECT_NAME_LEN,
+		Max: &consts.MAX_PROJECT_NAME_LEN,
+	}).Validate(),
+	gv.NewBody("description", func(_, _, _ string) string {
+		return fmt.Sprintf(
+			"Description must be between %d and %d characters long",
+			consts.MIN_PROJECT_DESCRIPTION_LEN,
+			consts.MAX_PROJECT_DESCRIPTION_LEN,
+		)
 	}).Chain().Optional().Length(&vgo.IsLengthOpts{
 		Min: consts.MIN_PROJECT_DESCRIPTION_LEN,
 		Max: &consts.MAX_PROJECT_DESCRIPTION_LEN,

@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"logtheus/project/internal/services"
+	sharedGrpc "logtheus/shared/pkg/grpc"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
+	"logtheus/shared/pkg/utils"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -39,6 +41,28 @@ func (h *ProjectHandler) CreateProject(ctx context.Context, req *projectProto.Cr
 	}, nil
 }
 
+func (h *ProjectHandler) UpdateProject(ctx context.Context, req *projectProto.UpdateProjectRequest) (*projectProto.Project, error) {
+	project, err := h.projectService.UpdateProject(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &projectProto.Project{
+		Id:          project.ID,
+		Name:        project.Name,
+		Description: *project.Description,
+		CreatedAt:   timestamppb.New(project.CreatedAt),
+		UpdatedAt:   timestamppb.New(project.UpdatedAt),
+	}, nil
+}
+
+func (h *ProjectHandler) DeleteProject(ctx context.Context, req *projectProto.DeleteProjectRequest) (*emptypb.Empty, error) {
+	if err := h.projectService.DeleteProject(ctx, req.ProjectId); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func (h *ProjectHandler) GetMyProjects(ctx context.Context, req *emptypb.Empty) (*projectProto.GetMyProjectsResponse, error) {
 	projects, max, err := h.projectService.GetMyProjects(ctx)
 	if err != nil {
@@ -71,6 +95,20 @@ func (h *ProjectHandler) GetProjectById(ctx context.Context, req *projectProto.G
 		Description: *project.Description,
 		CreatedAt:   timestamppb.New(project.CreatedAt),
 		UpdatedAt:   timestamppb.New(project.UpdatedAt),
+	}, nil
+}
+
+func (h *ProjectHandler) GetMemberRole(ctx context.Context, req *projectProto.GetMemberRoleRequest) (*projectProto.GetMemberRoleResponse, error) {
+	role, err := h.projectService.GetMemberRole(req.UserId, req.ProjectId)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, sharedGrpc.WithNotFound("Project member not found")
+	}
+
+	return &projectProto.GetMemberRoleResponse{
+		Role: utils.HttpRoleToGRPCRole(*role),
 	}, nil
 }
 

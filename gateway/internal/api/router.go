@@ -16,6 +16,7 @@ func NewRouter(container *dig.Container) *gin.Engine {
 	{
 		routes.RegisterUserRoutes(api, container)
 		routes.RegisterProjectRoutes(api, container)
+		routes.RegisterApplicationRoutes(api, container)
 	}
 	return router
 }

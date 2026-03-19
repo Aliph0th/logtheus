@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"logtheus/shared/pkg/interceptors"
-	projectProto "logtheus/shared/pkg/pb/v1/project"
+	applicationProto "logtheus/shared/pkg/pb/v1/application"
 	"logtheus/shared/pkg/utils"
 
 	"go.uber.org/dig"
@@ -19,7 +19,7 @@ func StartGRPCServer(port int, container *dig.Container) error {
 		return fmt.Errorf("failed to listen on port %d: %w", port, err)
 	}
 
-	handler := utils.MustResolve[*ProjectHandler](container)
+	handler := utils.MustResolve[*ApplicationHandler](container)
 	authInterceptor := utils.MustResolve[*interceptors.AuthInterceptor](container)
 	errorInterceptor := utils.MustResolve[*interceptors.ErrorInterceptor](container)
 
@@ -31,7 +31,7 @@ func StartGRPCServer(port int, container *dig.Container) error {
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(chainedInterceptor),
 	)
-	projectProto.RegisterProjectServiceServer(grpcServer, handler)
+	applicationProto.RegisterApplicationServiceServer(grpcServer, handler)
 
 	slog.Info("gRPC server starting", "port", port)
 	if err := grpcServer.Serve(listener); err != nil {
