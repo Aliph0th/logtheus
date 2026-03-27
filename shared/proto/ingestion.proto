@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package logtheus.ingestion.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/ingestion";
+
+import "google/protobuf/timestamp.proto";
+
+// Receives logs in different formats and normalizes them.
+service IngestionService {
+  // Accepts a batch of logs and returns ingest status.
+  rpc IngestLogs (IngestLogRequest) returns (IngestLogResponse);
+}
+
+message IngestLogItem {
+  bytes                     raw_data  = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message IngestLogRequest {
+  string                 api_key   = 1;
+  repeated IngestLogItem logs      = 2;
+  string                 source_ip = 3;
+}
+
+message IngestLogResponse {
+  bool   success        = 1;
+  uint32 accepted_count = 2;
+}

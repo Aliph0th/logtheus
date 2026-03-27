@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package logtheus.logengine.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/logengine";
+
+import "google/protobuf/timestamp.proto";
+
+message LogItem {
+  uint64 application_id = 1;
+  string application_name = 2;
+  uint64 project_id = 3;
+  string format = 4;
+  string source_ip = 5;
+  google.protobuf.Timestamp received_at = 6;
+  bytes raw_data = 7;
+  map<string, string> attributes = 8;
+}
+
+// Core log processing and querying service.
+service LogEngineService {
+   // Save logs to the storages
+  rpc SaveLogs(SaveLogsRequest) returns (SaveLogsResponse);
+}
+
+message SaveLogsRequest {
+  repeated LogItem logs = 1;
+}
+
+message SaveLogsResponse {
+  bool   ok          = 1;
+  uint32 saved_count = 2;
+}

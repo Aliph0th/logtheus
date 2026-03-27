@@ -7,6 +7,7 @@ import (
 	"logtheus/application/internal/consts"
 	"logtheus/application/internal/models"
 	"logtheus/application/internal/repository"
+	"logtheus/application/internal/types"
 	"logtheus/shared/pkg/grpc"
 	applicationProto "logtheus/shared/pkg/pb/v1/application"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
@@ -165,4 +166,21 @@ func (s *ApplicationService) GetApplicationByID(ctx context.Context, application
 	}
 
 	return app, nil
+}
+
+func (s *ApplicationService) ValidateApiKey(_ context.Context, apiKey string) (*types.ApplicationInfo, error) {
+	appInfo, err := s.apiKeyService.ValidateAPIKey(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return appInfo, nil
+}
+
+func (s *ApplicationService) ValidateApiKeyLight(_ context.Context, apiKey string) (bool, error) {
+	valid, err := s.apiKeyService.ValidateAPIKeyLight(apiKey)
+	if err != nil {
+		return false, err
+	}
+	return valid, nil
 }

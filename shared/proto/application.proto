@@ -19,6 +19,12 @@ service ApplicationService {
   // Creates a new application.
   rpc CreateApplication (CreateApplicationRequest) returns (CreateApplicationResponse);
 
+  // Validates application API key and returns related application id.
+  rpc ValidateApiKey (ValidateApiKeyRequest) returns (ValidateApiKeyResponse);
+
+  // Lightweight validation of API key
+  rpc ValidateApiKeyLight (ValidateApiKeyRequest) returns (LightValidateApiKeyResponse);
+
   // Get all applications by project id.
   rpc GetApplicationsByProjectId (GetApplicationsByProjectIdRequest) returns (GetApplicationsByProjectIdResponse);
 
@@ -42,6 +48,20 @@ message CreateApplicationResponse {
   Application application = 1;
   uint32      max         = 2;
   string      api_key     = 3;
+}
+
+message ValidateApiKeyRequest {
+  string api_key = 1;
+}
+
+message ValidateApiKeyResponse {
+  uint64 application_id = 1;
+  string application_name = 2;
+  uint64 project_id = 3;
+}
+
+message LightValidateApiKeyResponse {
+  bool valid = 1;
 }
 
 message UpdateApplicationRequest {

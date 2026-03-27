@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"logtheus/application/internal/models"
+	"logtheus/application/internal/types"
 	"logtheus/shared/pkg/grpc"
 	"logtheus/shared/pkg/storages"
 
@@ -58,4 +59,26 @@ func (r *ApplicationRepository) GetByProjectID(projectID uint64) ([]*models.Appl
 
 func (r *ApplicationRepository) SaveApiKey(key *models.ApplicationKey) error {
 	return r.db.Create(key).Error
+}
+
+func (r *ApplicationRepository) GetApiKey(signature string) (*models.ApplicationKey, error) {
+	var key models.ApplicationKey
+	err := r.db.Where("signature = ?", signature).First(&key).Error
+	if err != nil {
+		return nil, err
+	}
+	return &key, nil
+}
+
+func (r *ApplicationRepository) GetApplicationInfoBySignature(signature string) (*types.ApplicationInfo, error) {
+	var info types.ApplicationInfo
+	err := r.db.Table("application_keys AS K").
+		Joins("INNER JOIN applications AS A ON K.application_id = A.id").
+		Where("K.signature = ?", signature).
+		Select("A.id AS id, A.name AS name, A.project_id AS project_id, K.prefix AS key_prefix, K.signature AS key_signature, K.token_hash AS key_token_hash").
+		Take(&info).Error
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
 }

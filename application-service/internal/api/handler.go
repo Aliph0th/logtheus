@@ -98,3 +98,27 @@ func (h *ApplicationHandler) GetApplicationById(ctx context.Context, req *applic
 		UpdatedAt:   timestamppb.New(app.UpdatedAt),
 	}, nil
 }
+
+func (h *ApplicationHandler) ValidateApiKey(ctx context.Context, req *applicationProto.ValidateApiKeyRequest) (*applicationProto.ValidateApiKeyResponse, error) {
+	appInfo, err := h.applicationService.ValidateApiKey(ctx, req.ApiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &applicationProto.ValidateApiKeyResponse{
+		ApplicationId:   appInfo.ID,
+		ApplicationName: appInfo.Name,
+		ProjectId:       appInfo.ProjectID,
+	}, nil
+}
+
+func (h *ApplicationHandler) ValidateApiKeyLight(ctx context.Context, req *applicationProto.ValidateApiKeyRequest) (*applicationProto.LightValidateApiKeyResponse, error) {
+	valid, err := h.applicationService.ValidateApiKeyLight(ctx, req.ApiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &applicationProto.LightValidateApiKeyResponse{
+		Valid: valid,
+	}, nil
+}

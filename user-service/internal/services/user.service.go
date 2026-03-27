@@ -57,7 +57,7 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 		Password: string(passwordHash),
 	}
 	if err := s.repo.Create(user); err != nil {
-		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_CREATE_FAILED)
+		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
 	}
 
 	token, err := s.tokenService.IssueEmailVerificationToken(user.ID)
@@ -104,11 +104,11 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, req *userProto.Verify
 		if errors.As(err, &grpcErr) {
 			return "", "", grpcErr
 		}
-		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
+		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
 	}
 
 	if err := s.repo.VerifyEmail(auth.UserID); err != nil {
-		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_USER_VERIFY_EMAIL_FAILED)
+		return "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
 	}
 
 	accessToken, refreshToken := s.tokenService.SignAuthTokens(&types.UserAuthPayload{

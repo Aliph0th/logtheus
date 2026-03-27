@@ -39,9 +39,30 @@ services:
          - logtheus_user_redis:/data
       networks:
          - logtheus_net
+   clickhouse:
+      image: clickhouse/clickhouse-server:26.2-alpine
+      container_name: logtheus_logengine_clickhouse
+      restart: unless-stopped
+      environment:
+         - CLICKHOUSE_DB=${CLICKHOUSE_LOGENGINE_DB}
+         - CLICKHOUSE_USER=${CLICKHOUSE_LOGENGINE_USER}
+         - CLICKHOUSE_PASSWORD=${CLICKHOUSE_LOGENGINE_PASSWORD}
+         - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      ports:
+         - 8123:8123
+         - 9000:9000
+      volumes:
+         - logtheus_logengine_clickhouse:/var/lib/clickhouse
+      ulimits:
+         nofile:
+            soft: 262144
+            hard: 262144
+      networks:
+         - logtheus_net
 volumes:
    logtheus_user_db:
    logtheus_project_db:
    logtheus_user_redis:
+   logtheus_logengine_clickhouse:
 networks:
    logtheus_net:

@@ -10,5 +10,6 @@ type AppConfig struct {
 		User        string `mapstructure:"USER_SERVICE"`
 		Project     string `mapstructure:"PROJECT_SERVICE"`
 		Application string `mapstructure:"APPLICATION_SERVICE"`
+		Ingestion   string `mapstructure:"INGESTION_SERVICE"`
 	} `mapstructure:",squash"`
 }

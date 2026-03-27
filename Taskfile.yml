@@ -11,7 +11,16 @@ tasks:
 
    dev:all:
       desc: Run all services
-      deps: [dev:gateway, dev:user, dev:project, dev:mail, dev:application]
+      deps:
+         [
+            dev:gateway,
+            dev:user,
+            dev:project,
+            dev:mail,
+            dev:application,
+            dev:ingestion,
+            dev:logengine
+         ]
 
    protoc:
       desc: Generate protobuf code
@@ -52,5 +61,19 @@ tasks:
       desc: Application Service
       dir: ./application-service
       prefix: 'APPLICATION_SERVICE'
+      cmds:
+         - air -c .air.toml
+
+   dev:ingestion:
+      desc: Ingestion Service
+      dir: ./ingestion-service
+      prefix: 'INGESTION_SERVICE'
+      cmds:
+         - air -c .air.toml
+
+   dev:logengine:
+      desc: Log Engine Service
+      dir: ./log-engine-service
+      prefix: 'LOG_ENGINE_SERVICE'
       cmds:
          - air -c .air.toml
