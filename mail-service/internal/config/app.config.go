@@ -13,4 +13,11 @@ type AppConfig struct {
 		Password string `mapstructure:"MAIL_PASSWORD"`
 		From     string `mapstructure:"MAIL_FROM"`
 	} `mapstructure:",squash"`
+
+	Kafka struct {
+		Brokers   string `mapstructure:"KAFKA_BROKERS"`
+		Username  string `mapstructure:"KAFKA_USERNAME"`
+		Password  string `mapstructure:"KAFKA_PASSWORD"`
+		Mechanism string `mapstructure:"KAFKA_MECHANISM"`
+	} `mapstructure:",squash"`
 }

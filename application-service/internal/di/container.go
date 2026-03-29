@@ -7,7 +7,6 @@ import (
 	"logtheus/application/internal/services"
 	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/interceptors"
-	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/storages"
@@ -26,9 +25,6 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	})
 
 	// gRPC Clients
-	_ = c.Provide(func(cfg *config.AppConfig) mailProto.MailServiceClient {
-		return clients.NewMailClient(cfg.Services.Mail)
-	})
 	_ = c.Provide(func(cfg *config.AppConfig) projectProto.ProjectServiceClient {
 		return clients.NewProjectClient(cfg.Services.Project)
 	})

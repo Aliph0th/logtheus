@@ -3,8 +3,8 @@ package di
 import (
 	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/interceptors"
-	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	"logtheus/shared/pkg/storages"
+	"logtheus/shared/pkg/types"
 	"logtheus/user/internal/api"
 	"logtheus/user/internal/config"
 	"logtheus/user/internal/repository"
@@ -27,9 +27,12 @@ func Build(cfg *config.AppConfig) *dig.Container {
 		return db
 	})
 
-	// gRPC Clients
-	_ = c.Provide(func(cfg *config.AppConfig) mailProto.MailServiceClient {
-		return clients.NewMailClient(cfg.Services.Mail)
+	_ = c.Provide(func(cfg *config.AppConfig) *clients.MailEventProducer {
+		return clients.NewMailEventProducer(cfg.Services.KafkaBrokers, &types.KafkaAuthOptions{
+			Username:  cfg.Services.KafkaUsername,
+			Password:  cfg.Services.KafkaPassword,
+			Mechanism: cfg.Services.KafkaMechanism,
+		})
 	})
 
 	// Repositories

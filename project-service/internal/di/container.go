@@ -7,9 +7,9 @@ import (
 	"logtheus/project/internal/services"
 	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/interceptors"
-	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/storages"
+	"logtheus/shared/pkg/types"
 
 	"go.uber.org/dig"
 )
@@ -29,8 +29,12 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	})
 
 	// gRPC Clients
-	_ = c.Provide(func(cfg *config.AppConfig) mailProto.MailServiceClient {
-		return clients.NewMailClient(cfg.Services.Mail)
+	_ = c.Provide(func(cfg *config.AppConfig) *clients.MailEventProducer {
+		return clients.NewMailEventProducer(cfg.Services.KafkaBrokers, &types.KafkaAuthOptions{
+			Username:  cfg.Services.KafkaUsername,
+			Password:  cfg.Services.KafkaPassword,
+			Mechanism: cfg.Services.KafkaMechanism,
+		})
 	})
 	_ = c.Provide(func(cfg *config.AppConfig) userProto.UserServiceClient {
 		return clients.NewUserClient(cfg.Services.User)

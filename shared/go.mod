@@ -5,6 +5,7 @@ go 1.25.5
 require (
 	github.com/Marlliton/slogpretty v0.1.3
 	github.com/redis/go-redis/v9 v9.18.0
+	github.com/segmentio/kafka-go v0.4.50
 	github.com/spf13/viper v1.21.0
 	go.uber.org/dig v1.19.0
 	google.golang.org/grpc v1.79.1
@@ -22,6 +23,8 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect

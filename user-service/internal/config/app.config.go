@@ -27,6 +27,9 @@ type AppConfig struct {
 	} `mapstructure:",squash"`
 
 	Services struct {
-		Mail string `mapstructure:"MAIL_SERVICE"`
+		KafkaBrokers   string `mapstructure:"KAFKA_BROKERS"`
+		KafkaUsername  string `mapstructure:"KAFKA_USERNAME"`
+		KafkaPassword  string `mapstructure:"KAFKA_PASSWORD"`
+		KafkaMechanism string `mapstructure:"KAFKA_MECHANISM"`
 	} `mapstructure:",squash"`
 }

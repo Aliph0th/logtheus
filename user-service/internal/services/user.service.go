@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
-	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/types"
 	"logtheus/shared/pkg/utils"
@@ -16,13 +16,12 @@ import (
 	"logtheus/user/internal/repository"
 
 	"golang.org/x/crypto/bcrypt"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type UserService struct {
 	repo         *repository.UserRepository
 	tokenService *TokenService
-	mailClient   mailProto.MailServiceClient
+	mailProducer *clients.MailEventProducer
 	cfg          *config.AppConfig
 }
 
@@ -30,12 +29,12 @@ func NewUserService(
 	repo *repository.UserRepository,
 	tokenService *TokenService,
 	cfg *config.AppConfig,
-	mailClient mailProto.MailServiceClient,
+	mailProducer *clients.MailEventProducer,
 ) *UserService {
 	return &UserService{
 		repo:         repo,
 		tokenService: tokenService,
-		mailClient:   mailClient,
+		mailProducer: mailProducer,
 		cfg:          cfg,
 	}
 }
@@ -65,7 +64,7 @@ func (s *UserService) CreateUser(req *userProto.RegisterUserRequest) (*models.Us
 		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_VERIFICATION_TOKEN_ISSUE_FAILED)
 	}
 
-	_, err = s.sendVerifyEmail(user.Email, user.Username, token)
+	err = s.sendVerifyEmail(user.Email, user.Username, token)
 	if err != nil {
 		return nil, "", "", grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_SEND_EMAIL_FAILED)
 	}
@@ -140,21 +139,17 @@ func (s *UserService) GetMe(ctx context.Context) (*models.User, error) {
 	return user, nil
 }
 
-func (s *UserService) sendVerifyEmail(email, username, code string) (*mailProto.SuccessfulResponse, error) {
+func (s *UserService) sendVerifyEmail(email, username, code string) error {
 	ctx := context.Background()
 
-	req := &mailProto.SendVerifyEmailRequest{
-		Email:      email,
-		Username:   username,
-		Code:       code,
-		Expiration: durationpb.New(userConsts.TTL_VERIFY_TOKEN),
+	event := &types.VerifyEmailEvent{
+		Email:             email,
+		Username:          username,
+		Code:              code,
+		ExpirationMinutes: uint8(userConsts.TTL_VERIFY_TOKEN.Minutes()),
 	}
 
-	response, err := s.mailClient.SendVerifyEmail(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+	return s.mailProducer.PublishVerifyEmail(ctx, event)
 }
 
 func (s *UserService) GetUserByIdentifier(req *userProto.GetUserRequest) (*models.User, error) {

@@ -6,11 +6,12 @@ import (
 	"logtheus/project/internal/config"
 	"logtheus/project/internal/models"
 	"logtheus/project/internal/repository"
+	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
-	mailProto "logtheus/shared/pkg/pb/v1/mail"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
 	userProto "logtheus/shared/pkg/pb/v1/user"
+	"logtheus/shared/pkg/types"
 	"logtheus/shared/pkg/utils"
 	"time"
 
@@ -25,7 +26,7 @@ type InvitesService struct {
 	repo           *repository.MemberRepository
 	projectService *ProjectService
 	userClient     userProto.UserServiceClient
-	mailClient     mailProto.MailServiceClient
+	mailProducer   *clients.MailEventProducer
 	cfg            *config.AppConfig
 }
 
@@ -33,14 +34,14 @@ func NewInvitesService(
 	repo *repository.MemberRepository,
 	projectService *ProjectService,
 	userClient userProto.UserServiceClient,
-	mailClient mailProto.MailServiceClient,
+	mailProducer *clients.MailEventProducer,
 	cfg *config.AppConfig,
 ) *InvitesService {
 	return &InvitesService{
 		repo:           repo,
 		projectService: projectService,
 		userClient:     userClient,
-		mailClient:     mailClient,
+		mailProducer:   mailProducer,
 		cfg:            cfg,
 	}
 }
@@ -113,7 +114,7 @@ func (s *InvitesService) CreateInvite(ctx context.Context, req *projectProto.Inv
 		return err
 	}
 
-	_, err = s.sendInviteEmail(inviteeName, req.Email, referrer.Username, project.Name, token, timestamppb.New(expiration))
+	err = s.sendInviteEmail(inviteeName, req.Email, referrer.Username, project.Name, token, timestamppb.New(expiration))
 	if err != nil {
 		return err
 	}
@@ -123,23 +124,19 @@ func (s *InvitesService) CreateInvite(ctx context.Context, req *projectProto.Inv
 func (s *InvitesService) sendInviteEmail(
 	inviteeName, inviteeEmail, referrer, projectName, token string,
 	expiration *timestamppb.Timestamp,
-) (*mailProto.SuccessfulResponse, error) {
+) error {
 	ctx := context.Background()
 
-	req := &mailProto.SendInviteEmailRequest{
+	event := &types.InviteEmailEvent{
 		InviteeName: inviteeName,
 		Referrer:    referrer,
 		ProjectName: projectName,
 		Email:       inviteeEmail,
 		Code:        token,
-		Expiration:  expiration,
+		ExpiresAt:   expiration.AsTime(),
 	}
 
-	response, err := s.mailClient.SendInviteEmail(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+	return s.mailProducer.PublishInviteEmail(ctx, event)
 }
 
 func (s *InvitesService) createToken(inviteeEmail string, projectID uint64, expiresAt *time.Time, ctx context.Context) (string, error) {

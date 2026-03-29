@@ -20,11 +20,6 @@ func Build(cfg *config.AppConfig) *dig.Container {
 		return storages.NewClickHouseStorage(cfg)
 	})
 
-	// gRPC Clients
-	// _ = c.Provide(func(cfg *config.AppConfig) mailProto.MailServiceClient {
-	// 	return clients.NewMailClient(cfg.Services.Mail)
-	// })
-
 	//Repositories
 	_ = c.Provide(repository.NewLogRepository)
 

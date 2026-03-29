@@ -14,7 +14,12 @@ require (
 	logtheus/shared v0.0.0-00010101000000-000000000000
 )
 
-require github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/pierrec/lz4/v4 v4.1.26 // indirect
+	github.com/segmentio/kafka-go v0.4.50 // indirect
+)
 
 require (
 	github.com/Marlliton/slogpretty v0.1.3 // indirect

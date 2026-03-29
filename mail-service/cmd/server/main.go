@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log/slog"
+	"os/signal"
+	"syscall"
 
-	"logtheus/mail/internal/api"
 	"logtheus/mail/internal/config"
 	"logtheus/mail/internal/di"
+	"logtheus/mail/internal/services"
 	"logtheus/shared/pkg/utils"
 	sl "logtheus/shared/pkg/utils/logger"
 	"os"
@@ -22,9 +25,15 @@ func main() {
 	slog.SetDefault(logger)
 
 	container := di.Build(cfg)
+	consumer := utils.MustResolve[*services.MailConsumer](container)
 
-	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {
-		slog.Error("Failed to start gRPC server", sl.Error(err))
-		os.Exit(1)
-	}
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	slog.Info("Mail worker starting")
+	consumer.Start(ctx)
+	slog.Info("Mail worker started, waiting for shutdown signal")
+
+	<-ctx.Done()
+	slog.Info("Mail worker stopped")
 }
