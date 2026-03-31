@@ -8,7 +8,6 @@ require (
 	github.com/segmentio/kafka-go v0.4.50
 	github.com/wneessen/go-mail v0.7.2
 	go.uber.org/dig v1.19.0
-	google.golang.org/grpc v1.79.1
 	logtheus/shared v0.0.0-00010101000000-000000000000
 )
 
@@ -32,6 +31,7 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d // indirect
+	google.golang.org/grpc v1.79.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

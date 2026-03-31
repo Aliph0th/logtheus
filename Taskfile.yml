@@ -11,14 +11,14 @@ tasks:
 
    dev:all:
       desc: Run all services
-      deps:
-         [
+      deps: [
             dev:gateway,
             dev:user,
             dev:project,
             dev:mail,
             dev:application,
-            dev:ingestion,
+            # dev:ingestion,
+            dev:ingestion:python,
             dev:logengine
          ]
 
@@ -28,6 +28,14 @@ tasks:
       prefix: 'PROTOC'
       cmds:
          - protoc -I ./shared/proto ./shared/proto/*.proto --go_out=shared --go-grpc_out=shared --go_opt=module=logtheus/shared --go-grpc_opt=module=logtheus/shared
+
+   protoc:python:
+      desc: Generate Python protobuf code for ingestion-service
+      dir: .
+      prefix: 'PROTOC_PY'
+      cmds:
+         - python -m grpc_tools.protoc -I ./shared/proto --python_out=./ingestion-service/app/proto --grpc_python_out=./ingestion-service/app/proto ./shared/proto/ingestion.proto ./shared/proto/application.proto ./shared/proto/logengine.proto
+         - python -c "from pathlib import Path; out=Path('ingestion-service/app/proto'); files=list(out.glob('*_pb2_grpc.py')); replacements={'import ingestion_pb2 as ingestion__pb2':'from app.proto import ingestion_pb2 as ingestion__pb2','import application_pb2 as application__pb2':'from app.proto import application_pb2 as application__pb2','import logengine_pb2 as logengine__pb2':'from app.proto import logengine_pb2 as logengine__pb2'}; [p.write_text(__import__('functools').reduce(lambda s,kv:s.replace(kv[0],kv[1]), replacements.items(), p.read_text(encoding='utf-8')), encoding='utf-8') for p in files]"
 
    dev:gateway:
       desc: API Gateway
@@ -70,6 +78,13 @@ tasks:
       prefix: 'INGESTION_SERVICE'
       cmds:
          - air -c .air.toml
+
+   dev:ingestion:python:
+      desc: Ingestion Service Python
+      dir: ./ingestion-service
+      prefix: 'INGESTION_SERVICE_PY'
+      cmds:
+         - ./.venv/Scripts/python -m app.server
 
    dev:logengine:
       desc: Log Engine Service

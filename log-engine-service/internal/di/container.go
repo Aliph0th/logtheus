@@ -26,6 +26,7 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	//Services
 	_ = c.Provide(services.NewLogEngineService)
 	_ = c.Provide(services.NewS3Service)
+	_ = c.Provide(services.NewLogsConsumer)
 
 	//Interceptors
 	_ = c.Provide(interceptors.NewAuthInterceptor)

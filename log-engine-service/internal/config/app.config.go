@@ -20,5 +20,12 @@ type AppConfig struct {
 		Region    string `mapstructure:"S3_REGION"`
 	} `mapstructure:",squash"`
 
+	Kafka struct {
+		Brokers   string `mapstructure:"KAFKA_BROKERS"`
+		Username  string `mapstructure:"KAFKA_USERNAME"`
+		Password  string `mapstructure:"KAFKA_PASSWORD"`
+		Mechanism string `mapstructure:"KAFKA_MECHANISM"`
+	} `mapstructure:",squash"`
+
 	Services struct{} `mapstructure:",squash"`
 }
