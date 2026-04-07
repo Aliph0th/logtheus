@@ -1,0 +1,23 @@
+package api
+
+import (
+	"logtheus/gateway/internal/api/routes"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/dig"
+)
+
+func NewRouter(container *dig.Container) *gin.Engine {
+	router := gin.Default()
+	router.Use(cors.Default())
+
+	api := router.Group("/api/v1")
+	{
+		routes.RegisterUserRoutes(api, container)
+		routes.RegisterProjectRoutes(api, container)
+		routes.RegisterApplicationRoutes(api, container)
+		routes.RegisterLogRoutes(api, container)
+	}
+	return router
+}

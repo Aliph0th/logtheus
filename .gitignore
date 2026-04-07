@@ -14,5 +14,12 @@ logs
 go.work
 go.work.sum
 
+.venv/
+__pycache__/
+
 .env
 .vscode/
+
+shared/pkg/pb
+ingestion-service/app/proto
+ingestion-service/models

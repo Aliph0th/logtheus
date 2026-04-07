@@ -1,0 +1,84 @@
+syntax = "proto3";
+package logtheus.user.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/user";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+message User {
+  uint64                    id                = 1;
+  string                    email             = 2;
+  string                    username          = 3;
+  bool                      is_email_verified = 4;
+  google.protobuf.Timestamp created_at        = 5;
+  google.protobuf.Timestamp updated_at        = 6;
+}
+
+// Provides user services
+service UserService {
+  // Registers a new user.
+  rpc RegisterUser (RegisterUserRequest) returns (SuccessAuthUserResponse);
+
+  // Authenticates a user.
+  rpc LoginUser (LoginUserRequest) returns (SuccessAuthUserResponse);
+
+  // Verifies a user's email address.
+  rpc VerifyUserEmail (VerifyUserEmailRequest) returns (VerifyUserEmailResponse);
+
+  // Retrieves the authenticated user's information.
+  rpc GetMe (google.protobuf.Empty) returns (User);
+
+  //Validates jwt token and returns user info
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Get user by id or email
+  rpc GetUser (GetUserRequest) returns (User);
+
+  // Issues a new invite token
+  rpc IssueInviteToken (google.protobuf.Empty) returns (InviteTokenResponse);
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  uint64 user_id           = 1;
+  bool   is_email_verified = 2;
+}
+
+message RegisterUserRequest {
+  string email    = 1;
+  string password = 2;
+  string username = 3;
+}
+
+message LoginUserRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message VerifyUserEmailRequest {
+  string code = 1;
+}
+
+message SuccessAuthUserResponse {
+  User   user          = 1;
+  string access_token  = 2;
+  string refresh_token = 3;
+}
+
+message VerifyUserEmailResponse {
+  string access_token = 1;
+}
+
+message GetUserRequest {
+  oneof identifier {
+    uint64 user_id = 1;
+    string email = 2;
+  }
+}
+
+message InviteTokenResponse {
+  string token = 1;
+}

@@ -1,0 +1,94 @@
+syntax = "proto3";
+package logtheus.project.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/project";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+message Project {
+  uint64                    id          = 1;
+  string                    name        = 2;
+  string                    description = 3;
+  google.protobuf.Timestamp created_at  = 4;
+  google.protobuf.Timestamp updated_at  = 5;
+}
+
+// Provides project management services
+service ProjectService {
+  // Creates a new project.
+  rpc CreateProject (CreateProjectRequest) returns (CreateProjectResponse);
+
+  // Updates project fields.
+  rpc UpdateProject (UpdateProjectRequest) returns (Project);
+
+  // Deletes a project.
+  rpc DeleteProject (DeleteProjectRequest) returns (google.protobuf.Empty);
+
+  // Get my projects
+  rpc GetMyProjects (google.protobuf.Empty) returns (GetMyProjectsResponse);
+
+  // Get project by id
+  rpc GetProjectById (GetProjectByIdRequest) returns (Project);
+
+  // Get member role in a project
+  rpc GetMemberRole (GetMemberRoleRequest) returns (GetMemberRoleResponse);
+
+  // Invite a user to a project.
+  rpc CreateInvite (InviteUserRequest) returns (InviteUserResponse);
+}
+
+message CreateProjectRequest {
+  string name        = 1;
+  string description = 2;
+}
+
+message CreateProjectResponse {
+  Project project = 1;
+  uint32  max     = 2;
+}
+
+message UpdateProjectRequest {
+  uint64          project_id   = 1;
+  optional string name         = 2;
+  optional string description  = 3;
+}
+
+message DeleteProjectRequest {
+  uint64 project_id = 1;
+}
+
+message GetMyProjectsResponse {
+  repeated Project projects = 1;
+  uint32           max      = 2;
+}
+
+message GetProjectByIdRequest {
+  uint64 project_id = 1;
+}
+
+message GetMemberRoleRequest {
+  uint64 user_id    = 1;
+  uint64 project_id = 2;
+}
+
+message GetMemberRoleResponse {
+  Role role = 1;
+}
+
+message InviteUserRequest {
+  uint64 project_id = 1;
+  string email      = 2;
+  Role   role       = 3;
+
+  optional google.protobuf.Timestamp expires_at = 4;
+}
+
+message InviteUserResponse {
+  bool ok = 1;
+}
+
+enum Role {
+  OWNER  = 0;
+  MEMBER = 1;
+  VIEWER = 2;
+}

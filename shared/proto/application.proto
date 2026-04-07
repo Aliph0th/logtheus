@@ -1,0 +1,88 @@
+syntax = "proto3";
+package logtheus.application.v1;
+option go_package = "logtheus/shared/pkg/pb/v1/application";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+message Application {
+  uint64                    id          = 1;
+  string                    name        = 2;
+  string                    description = 3;
+  uint64                    project_id  = 4;
+  google.protobuf.Timestamp created_at  = 5;
+  google.protobuf.Timestamp updated_at  = 6;
+}
+
+// Provides application management services
+service ApplicationService {
+  // Creates a new application.
+  rpc CreateApplication (CreateApplicationRequest) returns (CreateApplicationResponse);
+
+  // Validates application API key and returns related application id.
+  rpc ValidateApiKey (ValidateApiKeyRequest) returns (ValidateApiKeyResponse);
+
+  // Lightweight validation of API key
+  rpc ValidateApiKeyLight (ValidateApiKeyRequest) returns (LightValidateApiKeyResponse);
+
+  // Get all applications by project id.
+  rpc GetApplicationsByProjectId (GetApplicationsByProjectIdRequest) returns (GetApplicationsByProjectIdResponse);
+
+  // Get application by id.
+  rpc GetApplicationById (GetApplicationByIdRequest) returns (Application);
+
+  // Updates application fields.
+  rpc UpdateApplication (UpdateApplicationRequest) returns (Application);
+
+  // Deletes an application.
+  rpc DeleteApplication (DeleteApplicationRequest) returns (google.protobuf.Empty);
+}
+
+message CreateApplicationRequest {
+  string name        = 1;
+  string description = 2;
+  uint64 project_id  = 3;
+}
+
+message CreateApplicationResponse {
+  Application application = 1;
+  uint32      max         = 2;
+  string      api_key     = 3;
+}
+
+message ValidateApiKeyRequest {
+  string api_key = 1;
+}
+
+message ValidateApiKeyResponse {
+  uint64 application_id = 1;
+  string application_name = 2;
+  uint64 project_id = 3;
+}
+
+message LightValidateApiKeyResponse {
+  bool valid = 1;
+}
+
+message UpdateApplicationRequest {
+  uint64          application_id = 1;
+  optional string name           = 2;
+  optional string description    = 3;
+}
+
+message DeleteApplicationRequest {
+  uint64 application_id = 1;
+}
+
+message GetApplicationsByProjectIdRequest {
+  uint64 project_id = 1;
+}
+
+message GetApplicationsByProjectIdResponse {
+  repeated Application applications = 1;
+  uint32               max          = 2;
+}
+
+message GetApplicationByIdRequest {
+  uint64 application_id = 1;
+}

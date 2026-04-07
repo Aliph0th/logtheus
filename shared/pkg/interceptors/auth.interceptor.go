@@ -1,0 +1,61 @@
+package interceptors
+
+import (
+	"context"
+	"logtheus/shared/pkg/consts"
+	"logtheus/shared/pkg/types"
+	"strconv"
+
+	grpcLib "google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+)
+
+type AuthInterceptor struct {
+}
+
+func NewAuthInterceptor() *AuthInterceptor {
+	return &AuthInterceptor{}
+}
+
+func (i *AuthInterceptor) Unary() grpcLib.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpcLib.UnaryServerInfo,
+		handler grpcLib.UnaryHandler,
+	) (any, error) {
+		userID, isEmailVerified, found := i.extractUserDataFromMetadata(ctx)
+		requestCtx := ctx
+		if found {
+			authPayload := &types.UserAuthPayload{
+				UserID:          userID,
+				IsEmailVerified: isEmailVerified,
+			}
+			requestCtx = context.WithValue(requestCtx, consts.AUTH_CONTEXT_KEY, authPayload)
+		}
+		return handler(requestCtx, req)
+
+	}
+}
+
+func (i *AuthInterceptor) extractUserDataFromMetadata(ctx context.Context) (uint64, bool, bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, false, false
+	}
+
+	var userID uint64
+	var isEmailVerified bool
+
+	if userIDStr := md.Get(consts.X_USER_ID_METADATA_KEY); len(userIDStr) > 0 {
+		if id, err := strconv.ParseUint(userIDStr[0], 10, 64); err == nil {
+			userID = id
+		}
+	}
+
+	if emailVerificationStr := md.Get(consts.X_EMAIL_VERIFIED_METADATA_KEY); len(emailVerificationStr) > 0 {
+		isEmailVerified = emailVerificationStr[0] == "true"
+	}
+
+	return userID, isEmailVerified, userID > 0
+}
