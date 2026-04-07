@@ -7,5 +7,9 @@ import (
 )
 
 func MustUserData(c context.Context) *types.UserAuthPayload {
-	return c.Value(consts.AUTH_CONTEXT_KEY).(*types.UserAuthPayload)
+	v, ok := c.Value(consts.AUTH_CONTEXT_KEY).(*types.UserAuthPayload)
+	if !ok {
+		return nil
+	}
+	return v
 }

@@ -46,7 +46,7 @@ tasks:
 
    dev:user:
       desc: User Service
-      dir: ./user-Service
+      dir: ./user-service
       prefix: 'USER_SERVICE'
       cmds:
          - air -c .air.toml

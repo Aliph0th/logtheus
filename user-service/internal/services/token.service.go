@@ -52,7 +52,10 @@ func (s *TokenService) IssueEmailVerificationToken(userID uint64) (string, error
 	if err != nil {
 		return "", fmt.Errorf("Error hashing token: %w", err)
 	}
-	s.repo.CreateInRedis(key, string(hashedToken), consts.TTL_VERIFY_TOKEN)
+	err = s.repo.CreateInRedis(key, string(hashedToken), consts.TTL_VERIFY_TOKEN)
+	if err != nil {
+		return "", fmt.Errorf("Error storing token in Redis: %w", err)
+	}
 	return token, nil
 }
 
@@ -69,7 +72,10 @@ func (s *TokenService) UseEmailVerificationToken(userID uint64, token string) er
 	if err != nil {
 		return grpc.WithInvalidArgument("Invalid verification token").WithSlug(sharedConsts.ERROR_CODE_INVALID_TOKEN)
 	}
-	s.repo.DeleteFromRedis(key)
+	err = s.repo.DeleteFromRedis(key)
+	if err != nil {
+		return fmt.Errorf("Error deleting verification token: %w", err)
+	}
 	return nil
 }
 

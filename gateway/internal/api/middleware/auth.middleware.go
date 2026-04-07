@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	excepts "logtheus/gateway/internal/api/exceptions"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/types"
@@ -33,7 +32,7 @@ func AuthMiddleware(allowNotVerifiedEmail bool, userClient userProto.UserService
 			)
 			return
 		}
-		claims, err := userClient.ValidateToken(context.Background(), &userProto.ValidateTokenRequest{Token: token})
+		claims, err := userClient.ValidateToken(ctx.Request.Context(), &userProto.ValidateTokenRequest{Token: token})
 		if err != nil {
 			excepts.RespondError(ctx, err)
 			return

@@ -74,40 +74,40 @@ func FromGrpcToDTO[T any](src any, dest *T) *T {
 }
 
 func GrpcCodeToHTTPStatus(code codes.Code) int {
-	switch code.String() {
-	case "Ok":
+	switch code {
+	case codes.OK:
 		return http.StatusOK
-	case "Canceled":
+	case codes.Canceled:
 		return http.StatusRequestTimeout
-	case "Unknown":
+	case codes.Unknown:
 		return http.StatusInternalServerError
-	case "InvalidArgument":
+	case codes.InvalidArgument:
 		return http.StatusBadRequest
-	case "DeadlineExceeded":
+	case codes.DeadlineExceeded:
 		return http.StatusRequestTimeout
-	case "NotFound":
+	case codes.NotFound:
 		return http.StatusNotFound
-	case "AlreadyExists":
+	case codes.AlreadyExists:
 		return http.StatusConflict
-	case "PermissionDenied":
+	case codes.PermissionDenied:
 		return http.StatusForbidden
-	case "ResourceExhausted":
+	case codes.ResourceExhausted:
 		return http.StatusTooManyRequests
-	case "FailedPrecondition":
+	case codes.FailedPrecondition:
 		return http.StatusBadRequest
-	case "Aborted":
+	case codes.Aborted:
 		return http.StatusConflict
-	case "OutOfRange":
+	case codes.OutOfRange:
 		return http.StatusBadRequest
-	case "Unimplemented":
+	case codes.Unimplemented:
 		return http.StatusNotImplemented
-	case "Internal":
+	case codes.Internal:
 		return http.StatusInternalServerError
-	case "Unavailable":
+	case codes.Unavailable:
 		return http.StatusServiceUnavailable
-	case "DataLoss":
+	case codes.DataLoss:
 		return http.StatusInternalServerError
-	case "Unauthenticated":
+	case codes.Unauthenticated:
 		return http.StatusUnauthorized
 	default:
 		return http.StatusInternalServerError

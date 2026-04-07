@@ -57,9 +57,12 @@ class IngestWorkerPool:
             raise QueueFullError("Ingestion queue is full") from exc
 
     def close(self) -> None:
-        self._stop_event.set()
         for _ in self._workers:
-            self._jobs.put(None)
+            try:
+                self._jobs.put(None, timeout=2)
+            except Exception:
+                logging.warning("Failed to enqueue sentinel for worker shutdown")
+        self._stop_event.set()
         for worker in self._workers:
             worker.join(timeout=5)
 

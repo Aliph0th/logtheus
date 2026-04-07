@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	excepts "logtheus/gateway/internal/api/exceptions"
 	"logtheus/gateway/internal/consts"
 	appProto "logtheus/shared/pkg/pb/v1/application"
@@ -32,7 +31,7 @@ func ApiKeyMiddleware(appClient appProto.ApplicationServiceClient) gin.HandlerFu
 			)
 			return
 		}
-		valid, err := appClient.ValidateApiKeyLight(context.Background(), &appProto.ValidateApiKeyRequest{ApiKey: token})
+		valid, err := appClient.ValidateApiKeyLight(ctx.Request.Context(), &appProto.ValidateApiKeyRequest{ApiKey: token})
 		if err != nil || !valid.Valid {
 			excepts.RespondError(
 				ctx,

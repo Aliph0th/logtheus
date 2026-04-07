@@ -10,18 +10,19 @@ import (
 )
 
 func GetGRPCContextWithAuth(ctx context.Context) context.Context {
-	grpcCtx := context.Background()
-
-	authData := ctx.Value(consts.AUTH_CONTEXT_KEY).(*types.UserAuthPayload)
-	if authData == nil {
-		return grpcCtx
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	grpcCtx = metadata.AppendToOutgoingContext(
-		grpcCtx,
+	authValue := ctx.Value(consts.AUTH_CONTEXT_KEY)
+	authData, ok := authValue.(*types.UserAuthPayload)
+	if !ok || authData == nil {
+		return ctx
+	}
+
+	return metadata.AppendToOutgoingContext(
+		ctx,
 		consts.X_USER_ID_METADATA_KEY, fmt.Sprintf("%d", authData.UserID),
 		consts.X_EMAIL_VERIFIED_METADATA_KEY, fmt.Sprintf("%v", authData.IsEmailVerified),
 	)
-
-	return grpcCtx
 }

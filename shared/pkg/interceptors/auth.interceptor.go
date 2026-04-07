@@ -47,13 +47,13 @@ func (i *AuthInterceptor) extractUserDataFromMetadata(ctx context.Context) (uint
 	var userID uint64
 	var isEmailVerified bool
 
-	if userIDStr := md.Get("x-user-id"); len(userIDStr) > 0 {
+	if userIDStr := md.Get(consts.X_USER_ID_METADATA_KEY); len(userIDStr) > 0 {
 		if id, err := strconv.ParseUint(userIDStr[0], 10, 64); err == nil {
 			userID = id
 		}
 	}
 
-	if emailVerificationStr := md.Get("x-email-verified"); len(emailVerificationStr) > 0 {
+	if emailVerificationStr := md.Get(consts.X_EMAIL_VERIFIED_METADATA_KEY); len(emailVerificationStr) > 0 {
 		isEmailVerified = emailVerificationStr[0] == "true"
 	}
 
