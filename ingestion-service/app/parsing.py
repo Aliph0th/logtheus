@@ -3,16 +3,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 from app.constants import LogFormat
+from app.utils.serialization import to_attribute_string
 
-
-def _to_attribute_string(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-
-    if isinstance(value, (dict, list, tuple, bool)) or value is None:
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-    return str(value)
 
 def detect_format(raw: bytes) -> LogFormat:
     try:
@@ -28,23 +20,25 @@ def detect_format(raw: bytes) -> LogFormat:
         return LogFormat.FORMAT_BINARY
 
 
-
 def parse_attributes(raw: bytes, fmt: LogFormat) -> Tuple[Dict[str, str], str]:
     if fmt == LogFormat.FORMAT_JSON:
         payload = json.loads(raw.decode("utf-8"))
         if isinstance(payload, dict):
-            attrs = {str(k): _to_attribute_string(v) for k, v in payload.items()}
-            message = _to_attribute_string(payload.get("message") or payload.get("msg") or payload.get("log") or "")
+            attrs = {str(k): to_attribute_string(v, ensure_ascii=False)
+                     for k, v in payload.items()}
+            message = to_attribute_string(
+                payload.get("message") or payload.get(
+                    "msg") or payload.get("log") or "",
+                ensure_ascii=False,
+            )
             return attrs, message
-        payload_str = _to_attribute_string(payload)
+        payload_str = to_attribute_string(payload, ensure_ascii=False)
         return {"value": payload_str}, payload_str
 
     if fmt == LogFormat.FORMAT_TEXT:
-        text = raw.decode("utf-8", errors="replace")
-        return {"message": text}, text
+        return {}, ""
 
     return {"raw_size": str(len(raw))}, ""
-
 
 
 def extract_api_key_signature(api_key: str) -> str:
@@ -52,7 +46,6 @@ def extract_api_key_signature(api_key: str) -> str:
     if len(parts) >= 3:
         return parts[1]
     return ""
-
 
 
 def now_utc() -> datetime:

@@ -7,11 +7,13 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
 from app.constants import MAX_INGESTION_BYTES
+from app.ingest_worker import IngestJob, IngestWorkerPool, QueueFullError
 from app.kafka_producer import LogsKafkaProducer
 from app.parsing import detect_format, parse_attributes, now_utc
 from app.proto import application_pb2, application_pb2_grpc
 from app.proto import ingestion_pb2, ingestion_pb2_grpc
 from app.proto import logengine_pb2
+from app.utils.serialization import compact_json_dumps, to_attribute_string
 
 
 class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
@@ -29,7 +31,43 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
             api_version=cfg.kafka_api_version,
         )
 
+        self._extractor = None
+        if cfg.model_hf_source:
+            from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
+
+            model_path = ensure_model_downloaded(
+                model_source=cfg.model_hf_source,
+                local_dir=cfg.model_local_dir,
+                revision=cfg.model_revision,
+                token=cfg.model_hf_token,
+            )
+            self._extractor = LogAttributeExtractor(
+                model_dir=str(model_path),
+                confidence_threshold=cfg.model_confidence_threshold,
+            )
+            logging.info(
+                "ML log model enabled from %s (version=%s)",
+                model_path,
+                self._extractor.model_version,
+            )
+        else:
+            logging.info(
+                "ML log model disabled: LOG_MODEL_HF_SOURCE is not configured")
+
+        self._worker_pool = IngestWorkerPool(
+            worker_count=cfg.ingest_worker_count,
+            queue_size=cfg.ingest_queue_size,
+            processor=self._process_job,
+        )
+
+        logging.info(
+            "Background ingestion workers started: count=%s queue_size=%s",
+            self._worker_pool.worker_count,
+            self._worker_pool.queue_size,
+        )
+
     def close(self) -> None:
+        self._worker_pool.close()
         self._logs_producer.close()
         self._app_channel.close()
 
@@ -57,36 +95,63 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         except grpc.RpcError as exc:
             context.abort(exc.code(), exc.details() or "ValidateApiKey failed")
 
-        logs = []
-        for item in request.logs:
-            fmt = detect_format(item.raw_data)
-            attrs, _ = parse_attributes(item.raw_data, fmt)
+        try:
+            self._worker_pool.enqueue(
+                IngestJob(
+                    application_id=app_info.application_id,
+                    application_name=app_info.application_name,
+                    project_id=app_info.project_id,
+                    source_ip=request.source_ip,
+                    raw_logs=[item.raw_data for item in request.logs],
+                )
+            )
+        except QueueFullError:
+            context.abort(
+                grpc.StatusCode.RESOURCE_EXHAUSTED,
+                "Ingestion queue is full, retry later",
+            )
+
+        return ingestion_pb2.IngestLogResponse(success=True, accepted_count=len(request.logs))
+
+    def _process_job(self, job: IngestJob) -> None:
+        logs: list[logengine_pb2.LogItem] = []
+
+        for raw_data in job.raw_logs:
+            fmt = detect_format(raw_data)
+            attrs, _ = parse_attributes(raw_data, fmt)
+
+            if self._extractor is not None:
+                text = raw_data.decode("utf-8", errors="replace")
+                prediction = self._extractor.predict(text)
+                ml_attrs = {
+                    key: to_attribute_string(value)
+                    for key, value in prediction.attributes.items()
+                }
+                attrs = {**attrs, **ml_attrs}
+                attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
+                if prediction.low_confidence_attributes:
+                    attrs["ml_low_confidence_attributes"] = compact_json_dumps(
+                        prediction.low_confidence_attributes,
+                    )
 
             ts = Timestamp()
             ts.FromDatetime(now_utc())
 
             logs.append(
                 logengine_pb2.LogItem(
-                    application_id=app_info.application_id,
-                    application_name=app_info.application_name,
-                    project_id=app_info.project_id,
+                    application_id=job.application_id,
+                    application_name=job.application_name,
+                    project_id=job.project_id,
                     format=fmt.value,
-                    source_ip=request.source_ip,
+                    source_ip=job.source_ip,
                     received_at=ts,
-                    raw_data=item.raw_data,
+                    raw_data=raw_data,
                     attributes=attrs,
                 )
             )
 
         payload = logengine_pb2.SaveLogsRequest(logs=logs).SerializeToString()
-        try:
-            self._logs_producer.publish(payload)
-        except Exception as exc:
-            logging.exception("Failed to publish logs batch to Kafka")
-            context.abort(grpc.StatusCode.INTERNAL,
-                          f"Kafka publish failed: {exc}")
-
-        return ingestion_pb2.IngestLogResponse(success=True, accepted_count=len(logs))
+        self._logs_producer.publish(payload)
 
 
 def serve(cfg: AppConfig) -> None:
