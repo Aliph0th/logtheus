@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false, reportMissingModuleSource=false, reportAttributeAccessIssue=false
 import logging
+import hashlib
 from concurrent import futures
 
 import grpc
@@ -7,7 +8,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
 from app.constants import MAX_INGESTION_BYTES
-from app.ingest_worker import IngestJob, IngestWorkerPool, QueueFullError
+from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError
 from app.kafka_producer import LogsKafkaProducer
 from app.parsing import detect_format, parse_attributes, now_utc
 from app.proto import application_pb2, application_pb2_grpc
@@ -25,6 +26,14 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         self._logs_producer = LogsKafkaProducer(
             brokers=cfg.kafka_brokers,
             topic=cfg.kafka_topic,
+            username=cfg.kafka_username,
+            password=cfg.kafka_password,
+            mechanism=cfg.kafka_mechanism,
+            api_version=cfg.kafka_api_version,
+        )
+        self._features_producer = LogsKafkaProducer(
+            brokers=cfg.kafka_brokers,
+            topic=cfg.kafka_features_topic,
             username=cfg.kafka_username,
             password=cfg.kafka_password,
             mechanism=cfg.kafka_mechanism,
@@ -69,6 +78,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
     def close(self) -> None:
         self._worker_pool.close()
         self._logs_producer.close()
+        self._features_producer.close()
         self._app_channel.close()
 
     def IngestLogs(self, request: ingestion_pb2.IngestLogRequest, context: grpc.ServicerContext) -> ingestion_pb2.IngestLogResponse:
@@ -95,6 +105,14 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         except grpc.RpcError as exc:
             context.abort(exc.code(), exc.details() or "ValidateApiKey failed")
 
+        payloads: list[IngestLogPayload] = []
+        for item in request.logs:
+            payloads.append(
+                IngestLogPayload(
+                    raw_data=item.raw_data,
+                )
+            )
+
         try:
             self._worker_pool.enqueue(
                 IngestJob(
@@ -102,7 +120,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     application_name=app_info.application_name,
                     project_id=app_info.project_id,
                     source_ip=request.source_ip,
-                    raw_logs=[item.raw_data for item in request.logs],
+                    logs=payloads,
                 )
             )
         except QueueFullError:
@@ -115,14 +133,18 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
 
     def _process_job(self, job: IngestJob) -> None:
         logs: list[logengine_pb2.LogItem] = []
+        features: list[logengine_pb2.LogFeatureItem] = []
 
-        for raw_data in job.raw_logs:
+        for item in job.logs:
+            raw_data = item.raw_data
             fmt = detect_format(raw_data)
             attrs, _ = parse_attributes(raw_data, fmt)
+            embedding: list[float] = []
 
             if self._extractor is not None:
                 text = raw_data.decode("utf-8", errors="replace")
                 prediction = self._extractor.predict(text)
+                embedding = prediction.embedding
                 ml_attrs = {
                     key: to_attribute_string(value)
                     for key, value in prediction.attributes.items()
@@ -135,7 +157,8 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     )
 
             ts = Timestamp()
-            ts.FromDatetime(now_utc())
+            received_at = now_utc()
+            ts.FromDatetime(received_at)
 
             logs.append(
                 logengine_pb2.LogItem(
@@ -150,8 +173,28 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                 )
             )
 
+            if embedding:
+                raw_data_sha256 = hashlib.sha256(raw_data).hexdigest()
+                receivedTs = Timestamp()
+                receivedTs.FromDatetime(received_at)
+                features.append(
+                    logengine_pb2.LogFeatureItem(
+                        application_id=job.application_id,
+                        project_id=job.project_id,
+                        source_ip=job.source_ip,
+                        received_at=receivedTs,
+                        embedding=embedding,
+                        attributes=attrs,
+                        raw_data_sha256=raw_data_sha256,
+                    )
+                )
+
         payload = logengine_pb2.SaveLogsRequest(logs=logs).SerializeToString()
         self._logs_producer.publish(payload)
+
+        if features:
+            featuresPayload = logengine_pb2.SaveLogFeaturesRequest(features=features).SerializeToString()
+            self._features_producer.publish(featuresPayload)
 
 
 def serve(cfg: AppConfig) -> None:

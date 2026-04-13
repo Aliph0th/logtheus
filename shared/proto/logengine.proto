@@ -14,12 +14,27 @@ message LogItem {
   google.protobuf.Timestamp received_at = 6;
   bytes raw_data = 7;
   map<string, string> attributes = 8;
+  string log_id = 9;
+}
+
+message LogFeatureItem {
+  uint64 application_id = 1;
+  uint64 project_id = 2;
+  string source_ip = 3;
+  google.protobuf.Timestamp received_at = 4;
+  repeated float embedding = 5;
+  map<string, string> attributes = 6;
+  string raw_data_sha256 = 7;
 }
 
 // Core log processing and querying service.
 service LogEngineService {
    // Save logs to the storages
   rpc SaveLogs(SaveLogsRequest) returns (SaveLogsResponse);
+}
+
+message SaveLogFeaturesRequest {
+  repeated LogFeatureItem features = 1;
 }
 
 message SaveLogsRequest {

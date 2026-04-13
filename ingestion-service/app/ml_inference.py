@@ -21,6 +21,7 @@ class ModelPrediction:
     message: str
     confidence: float
     model_version: str
+    embedding: list[float]
 
 
 class LogAttributeExtractor:
@@ -51,11 +52,17 @@ class LogAttributeExtractor:
         offsets = encoded.pop("offset_mapping")[0].tolist()
 
         with torch.no_grad():
-            output = self.model(**encoded)
+            output = self.model(**encoded, output_hidden_states=True)
         logits = output.logits[0]
         probs = torch.softmax(logits, dim=-1)
         pred_ids = torch.argmax(probs, dim=-1).tolist()
         pred_scores = torch.max(probs, dim=-1).values.tolist()
+
+        hidden_state = output.hidden_states[-1][0]
+        attention_mask = encoded["attention_mask"][0].unsqueeze(-1).to(hidden_state.dtype)
+        pooled = (hidden_state * attention_mask).sum(dim=0) / attention_mask.sum(dim=0).clamp(min=1.0)
+        pooled = torch.nn.functional.normalize(pooled, p=2, dim=0)
+        embedding = pooled.detach().cpu().tolist()
 
         grouped_values: dict[str, list[str]] = defaultdict(list)
         grouped_scores: dict[str, list[float]] = defaultdict(list)
@@ -144,6 +151,7 @@ class LogAttributeExtractor:
             message=text,
             confidence=overall_confidence,
             model_version=self.model_version,
+            embedding=embedding,
         )
 
 

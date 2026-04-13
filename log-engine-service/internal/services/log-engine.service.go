@@ -12,20 +12,23 @@ import (
 )
 
 type LogEngineService struct {
-	cfg  *config.AppConfig
-	repo *repository.LogRepository
-	s3   *S3Service
+	cfg         *config.AppConfig
+	repo        *repository.LogRepository
+	s3          *S3Service
+	logIdentity *LogIdentityService
 }
 
 func NewLogEngineService(
 	cfg *config.AppConfig,
 	repo *repository.LogRepository,
 	s3 *S3Service,
+	logIdentity *LogIdentityService,
 ) *LogEngineService {
 	return &LogEngineService{
-		cfg:  cfg,
-		repo: repo,
-		s3:   s3,
+		cfg:         cfg,
+		repo:        repo,
+		s3:          s3,
+		logIdentity: logIdentity,
 	}
 }
 
@@ -34,7 +37,7 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 		return grpc.WithInvalidArgument("Batch must contain at least one log").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
 	}
 
-	//TODO:
+	//TODO: validate?
 	// first := req.Logs[0]
 	// for _, item := range req.Logs[1:] {
 	// 	if item.ProjectId != first.ProjectId || item.ApplicationId != first.ApplicationId || item.ApplicationName != first.ApplicationName {
@@ -49,9 +52,13 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 
 	logRecords := make([]*models.LogRecord, 0, len(req.Logs))
 	for _, item := range req.Logs {
-		if item.ReceivedAt == nil {
-			return grpc.WithInvalidArgument("received_at is required for each log").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
-		}
+		//TODO: validate?
+		logID := s.logIdentity.BuildLogIDFromRawData(
+			item.ProjectId,
+			item.ApplicationId,
+			item.SourceIp,
+			item.RawData,
+		)
 
 		attributesJSON, marshalErr := json.Marshal(item.Attributes)
 		if marshalErr != nil {
@@ -59,6 +66,7 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 		}
 
 		logRecords = append(logRecords, &models.LogRecord{
+			LogID:           logID,
 			ApplicationID:   item.ApplicationId,
 			ApplicationName: item.ApplicationName,
 			ProjectID:       item.ProjectId,

@@ -13,6 +13,14 @@ type AppConfig struct {
 		Password string `mapstructure:"CLICKHOUSE_PASSWORD"`
 	} `mapstructure:",squash"`
 
+	Postgres struct {
+		Host     string `mapstructure:"POSTGRES_HOST"`
+		Port     int    `mapstructure:"POSTGRES_PORT"`
+		Name     string `mapstructure:"POSTGRES_DB"`
+		User     string `mapstructure:"POSTGRES_USER"`
+		Password string `mapstructure:"POSTGRES_PASSWORD"`
+	} `mapstructure:",squash"`
+
 	S3 struct {
 		AccessKey string `mapstructure:"S3_ACCESS_KEY"`
 		SecretKey string `mapstructure:"S3_SECRET_KEY"`

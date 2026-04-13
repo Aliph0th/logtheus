@@ -12,12 +12,17 @@ class QueueFullError(Exception):
 
 
 @dataclass
+class IngestLogPayload:
+    raw_data: bytes
+
+
+@dataclass
 class IngestJob:
-    application_id: str
+    application_id: int
     application_name: str
-    project_id: str
+    project_id: int
     source_ip: str
-    raw_logs: list[bytes]
+    logs: list[IngestLogPayload]
 
 
 class IngestWorkerPool:

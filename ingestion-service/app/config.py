@@ -10,6 +10,7 @@ class AppConfig:
     application_service: str
     kafka_brokers: str
     kafka_topic: str
+    kafka_features_topic: str
     kafka_username: str
     kafka_password: str
     kafka_mechanism: str
@@ -33,6 +34,7 @@ def load_config() -> AppConfig:
             "APPLICATION_SERVICE", "localhost:50054"),
         kafka_brokers=os.getenv("KAFKA_BROKERS", "localhost:9094"),
         kafka_topic=os.getenv("KAFKA_TOPIC", "logs.ingest.v1"),
+        kafka_features_topic=os.getenv("KAFKA_FEATURES_TOPIC", "logs.features.v1"),
         kafka_username=os.getenv("KAFKA_USERNAME", ""),
         kafka_password=os.getenv("KAFKA_PASSWORD", ""),
         kafka_mechanism=os.getenv("KAFKA_MECHANISM", "PLAIN"),
