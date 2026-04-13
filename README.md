@@ -77,7 +77,7 @@ The ingestion service can extract structured attributes from unformatted logs us
 
 Set these environment variables in `ingestion-service/.env`:
 
-- `LOG_MODEL_HF_SOURCE`: Hugging Face repo ID or full URL (uses [logtheus-ml](https://huggingface.co/Aliph0th/logtheus-ml))
+- `LOG_MODEL_HF_SOURCE`: Hugging Face repo ID or full URL (uses [logtheus-ml-base](https://huggingface.co/Aliph0th/logtheus-ml-base)) (but there's a large version [logtheus-ml-large](https://huggingface.co/Aliph0th/logtheus-ml-large))
   - Leave empty to disable ML extraction.
 - `LOG_MODEL_LOCAL_DIR`: Local directory where downloaded model will be cached
 - `LOG_MODEL_REVISION`: Model revision/branch on Hugging Face

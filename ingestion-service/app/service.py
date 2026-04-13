@@ -7,14 +7,14 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
-from app.constants import MAX_INGESTION_BYTES
+from app.constants import MAX_INGESTION_BYTES, LogFormat
 from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError
 from app.kafka_producer import LogsKafkaProducer
-from app.parsing import detect_format, parse_attributes, now_utc
 from app.proto import application_pb2, application_pb2_grpc
 from app.proto import ingestion_pb2, ingestion_pb2_grpc
 from app.proto import logengine_pb2
-from app.utils.serialization import compact_json_dumps, to_attribute_string
+from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
+from app.utils import compact_json_dumps, to_attribute_string, now_utc, detect_format, parse_json_attributes
 
 
 class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
@@ -40,28 +40,28 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
             api_version=cfg.kafka_api_version,
         )
 
-        self._extractor = None
-        if cfg.model_hf_source:
-            from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
-
-            model_path = ensure_model_downloaded(
-                model_source=cfg.model_hf_source,
-                local_dir=cfg.model_local_dir,
-                revision=cfg.model_revision,
-                token=cfg.model_hf_token,
-            )
-            self._extractor = LogAttributeExtractor(
-                model_dir=str(model_path),
-                confidence_threshold=cfg.model_confidence_threshold,
-            )
-            logging.info(
-                "ML log model enabled from %s (version=%s)",
-                model_path,
-                self._extractor.model_version,
-            )
-        else:
-            logging.info(
-                "ML log model disabled: LOG_MODEL_HF_SOURCE is not configured")
+        model_path = ensure_model_downloaded(
+            model_source=cfg.model_hf_source,
+            local_dir=cfg.model_local_dir,
+            revision=cfg.model_revision,
+            token=cfg.model_hf_token,
+        )
+        embedding_model_dir = ensure_model_downloaded(
+            model_source=cfg.embedding_model_hf_source,
+            local_dir=cfg.embedding_model_dir,
+            revision="main",
+            token=cfg.model_hf_token,
+        )
+        self._extractor = LogAttributeExtractor(
+            model_dir=str(model_path),
+            confidence_threshold=cfg.model_confidence_threshold,
+            embedding_model_dir=str(embedding_model_dir),
+        )
+        logging.info(
+            "ML log model enabled from %s (version=%s)",
+            model_path,
+            self._extractor.model_version,
+        )
 
         self._worker_pool = IngestWorkerPool(
             worker_count=cfg.ingest_worker_count,
@@ -87,16 +87,22 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                           "Batch must contain at least one log")
 
         total_size = 0
+        payloads: list[IngestLogPayload] = []
         for i, item in enumerate(request.logs):
             if not item.raw_data:
                 context.abort(grpc.StatusCode.INVALID_ARGUMENT,
                               f"logs[{i}].raw_data is required")
             total_size += len(item.raw_data)
 
-        if total_size > MAX_INGESTION_BYTES:
-            context.abort(
-                grpc.StatusCode.RESOURCE_EXHAUSTED,
-                f"Batch payload exceeds max allowed size: {MAX_INGESTION_BYTES} bytes, received: {total_size} bytes",
+            if total_size > MAX_INGESTION_BYTES:
+                context.abort(
+                    grpc.StatusCode.RESOURCE_EXHAUSTED,
+                    f"Batch payload exceeds max allowed size: {MAX_INGESTION_BYTES} bytes",
+                )
+            payloads.append(
+                IngestLogPayload(
+                    raw_data=item.raw_data,
+                )
             )
 
         try:
@@ -104,14 +110,6 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                 application_pb2.ValidateApiKeyRequest(api_key=request.api_key))
         except grpc.RpcError as exc:
             context.abort(exc.code(), exc.details() or "ValidateApiKey failed")
-
-        payloads: list[IngestLogPayload] = []
-        for item in request.logs:
-            payloads.append(
-                IngestLogPayload(
-                    raw_data=item.raw_data,
-                )
-            )
 
         try:
             self._worker_pool.enqueue(
@@ -137,28 +135,30 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
 
         for item in job.logs:
             raw_data = item.raw_data
+            attrs = {}
             fmt = detect_format(raw_data)
-            attrs, _ = parse_attributes(raw_data, fmt)
-            embedding: list[float] = []
+            match fmt:
+                case LogFormat.FORMAT_JSON:
+                    attrs, _ = parse_json_attributes(raw_data)
+                case LogFormat.FORMAT_TEXT:
+                    prediction = self._extractor.predict(
+                        raw_data.decode("utf-8", errors="replace"))
+                    attrs = {
+                        key: to_attribute_string(value)
+                        for key, value in prediction.attributes.items()
+                    }
+                    attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
+                    if prediction.low_confidence_attributes:
+                        attrs["ml_low_confidence_attributes"] = compact_json_dumps(
+                            prediction.low_confidence_attributes,
+                        )
+            embedding = self._extractor.encode_embedding(
+                raw_data.decode("utf-8", errors="replace")
+            )
 
-            if self._extractor is not None:
-                text = raw_data.decode("utf-8", errors="replace")
-                prediction = self._extractor.predict(text)
-                embedding = prediction.embedding
-                ml_attrs = {
-                    key: to_attribute_string(value)
-                    for key, value in prediction.attributes.items()
-                }
-                attrs = {**attrs, **ml_attrs}
-                attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
-                if prediction.low_confidence_attributes:
-                    attrs["ml_low_confidence_attributes"] = compact_json_dumps(
-                        prediction.low_confidence_attributes,
-                    )
-
-            ts = Timestamp()
-            received_at = now_utc()
-            ts.FromDatetime(received_at)
+            now = now_utc()
+            received_at = Timestamp()
+            received_at.FromDatetime(now)
 
             logs.append(
                 logengine_pb2.LogItem(
@@ -167,40 +167,35 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     project_id=job.project_id,
                     format=fmt.value,
                     source_ip=job.source_ip,
-                    received_at=ts,
+                    received_at=received_at,
                     raw_data=raw_data,
                     attributes=attrs,
                 )
             )
-
-            if embedding:
-                raw_data_sha256 = hashlib.sha256(raw_data).hexdigest()
-                receivedTs = Timestamp()
-                receivedTs.FromDatetime(received_at)
-                features.append(
-                    logengine_pb2.LogFeatureItem(
-                        application_id=job.application_id,
-                        project_id=job.project_id,
-                        source_ip=job.source_ip,
-                        received_at=receivedTs,
-                        embedding=embedding,
-                        attributes=attrs,
-                        raw_data_sha256=raw_data_sha256,
-                    )
+            features.append(
+                logengine_pb2.LogFeatureItem(
+                    application_id=job.application_id,
+                    project_id=job.project_id,
+                    source_ip=job.source_ip,
+                    received_at=received_at,
+                    embedding=embedding,
+                    attributes=attrs,
+                    raw_data_sha256=hashlib.sha256(raw_data).hexdigest(),
                 )
+            )
 
         payload = logengine_pb2.SaveLogsRequest(logs=logs).SerializeToString()
         self._logs_producer.publish(payload)
 
-        if features:
-            featuresPayload = logengine_pb2.SaveLogFeaturesRequest(features=features).SerializeToString()
-            self._features_producer.publish(featuresPayload)
+        featuresPayload = logengine_pb2.SaveLogFeaturesRequest(
+            features=features).SerializeToString()
+        self._features_producer.publish(featuresPayload)
 
 
 def serve(cfg: AppConfig) -> None:
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
-    svc = IngestionService(cfg)
-    ingestion_pb2_grpc.add_IngestionServiceServicer_to_server(svc, server)
+    service = IngestionService(cfg)
+    ingestion_pb2_grpc.add_IngestionServiceServicer_to_server(service, server)
 
     server.add_insecure_port(f"[::]:{cfg.port}")
     server.start()
@@ -209,4 +204,4 @@ def serve(cfg: AppConfig) -> None:
     try:
         server.wait_for_termination()
     finally:
-        svc.close()
+        service.close()
