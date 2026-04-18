@@ -6,9 +6,12 @@ import (
 	"logtheus/logengine/internal/config"
 	"logtheus/logengine/internal/models"
 	"logtheus/logengine/internal/repository"
+	"logtheus/logengine/internal/utils"
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type LogEngineService struct {
@@ -84,4 +87,60 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 	}
 
 	return nil
+}
+
+func (s *LogEngineService) GetVolumeSeries(ctx context.Context, req *logEngineProto.GetVolumeSeriesRequest) ([]*logEngineProto.TimeSeriesPoint, error) {
+	rows, repoErr := s.repo.GetVolumeSeries(ctx, req.Filter, req.Bucket)
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(consts.INTERNAL_ERROR_AGGREGATION_FAILED)
+	}
+
+	points := make([]*logEngineProto.TimeSeriesPoint, 0, len(rows))
+	for _, row := range rows {
+		points = append(points, &logEngineProto.TimeSeriesPoint{
+			Timestamp: timestamppb.New(row.Bucket),
+			Count:     row.Count,
+		})
+	}
+
+	return points, nil
+}
+
+func (s *LogEngineService) GetAggregationByField(ctx context.Context, req *logEngineProto.GetAggregationRequest) ([]*logEngineProto.AggregationItem, error) {
+	if _, ok := utils.AggregationFieldExpression(req.GetField()); !ok {
+		return nil, grpc.WithInvalidArgument("unsupported aggregation field").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
+	}
+
+	limit := req.Limit
+	if limit == 0 {
+		limit = 10
+	}
+
+	rows, repoErr := s.repo.GetAggregationByField(ctx, req.Filter, req.Field, limit)
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(consts.INTERNAL_ERROR_AGGREGATION_FAILED)
+	}
+
+	items := make([]*logEngineProto.AggregationItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, &logEngineProto.AggregationItem{
+			Value: row.Value,
+			Count: row.Count,
+		})
+	}
+
+	return items, nil
+}
+
+func (s *LogEngineService) GetLatencyStats(ctx context.Context, req *logEngineProto.GetLatencyStatsRequest) (*logEngineProto.LatencyStats, error) {
+	stats, repoErr := s.repo.GetLatencyStats(ctx, req.Filter)
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(consts.INTERNAL_ERROR_AGGREGATION_FAILED)
+	}
+
+	return &logEngineProto.LatencyStats{
+		P50: stats.P50,
+		P95: stats.P95,
+		P99: stats.P99,
+	}, nil
 }

@@ -4,11 +4,20 @@ import logging
 from dataclasses import dataclass
 from queue import Empty, Full, Queue
 from threading import Event, Thread
+from app.constants import LogFormat
 from typing import Callable
 
 
 class QueueFullError(Exception):
     pass
+
+
+@dataclass
+class PreparedLogEntry:
+    raw_data: bytes
+    fmt: LogFormat
+    attrs: dict[str, str]
+    embedding: list[float]
 
 
 @dataclass
@@ -66,7 +75,8 @@ class IngestWorkerPool:
             try:
                 self._jobs.put(None, timeout=2)
             except Exception:
-                logging.warning("Failed to enqueue sentinel for worker shutdown")
+                logging.warning(
+                    "Failed to enqueue sentinel for worker shutdown")
         self._stop_event.set()
         for worker in self._workers:
             worker.join(timeout=5)

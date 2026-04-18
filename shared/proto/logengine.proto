@@ -27,10 +27,81 @@ message LogFeatureItem {
   string raw_data_sha256 = 7;
 }
 
+message LogAggregationFilter {
+  uint64 project_id = 1;
+  optional uint64 application_id = 2;
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+  repeated string formats = 5;
+  repeated string source_ips = 6;
+}
+
+enum TimeBucket {
+  TIME_BUCKET_UNSPECIFIED = 0;
+  TIME_BUCKET_1M = 1;
+  TIME_BUCKET_5M = 2;
+  TIME_BUCKET_1H = 3;
+  TIME_BUCKET_5H = 4;
+  TIME_BUCKET_10H = 5;
+  TIME_BUCKET_24H = 6;
+}
+
 // Core log processing and querying service.
 service LogEngineService {
    // Save logs to the storages
   rpc SaveLogs(SaveLogsRequest) returns (SaveLogsResponse);
+
+  // Time-series volume of logs for dashboard charts.
+  rpc GetVolumeSeries(GetVolumeSeriesRequest) returns (GetVolumeSeriesResponse);
+
+  // Top values distribution for a selected canonical attributes field.
+  rpc GetAggregationByField(GetAggregationRequest) returns (GetAggregationResponse);
+
+  // Latency percentiles from canonical attributes.duration.
+  rpc GetLatencyStats(GetLatencyStatsRequest) returns (GetLatencyStatsResponse);
+}
+
+message TimeSeriesPoint {
+  google.protobuf.Timestamp timestamp = 1;
+  uint64 count = 2;
+}
+
+message AggregationItem {
+  string value = 1;
+  uint64 count = 2;
+}
+
+message LatencyStats {
+  double p50 = 1;
+  double p95 = 2;
+  double p99 = 3;
+}
+
+message GetAggregationRequest {
+  LogAggregationFilter filter = 1;
+  string field = 2;
+  uint32 limit = 3;
+}
+
+message GetAggregationResponse {
+  repeated AggregationItem items = 1;
+}
+
+message GetVolumeSeriesRequest {
+  LogAggregationFilter filter = 1;
+  TimeBucket bucket = 2;
+}
+
+message GetVolumeSeriesResponse {
+  repeated TimeSeriesPoint points = 1;
+}
+
+message GetLatencyStatsRequest {
+  LogAggregationFilter filter = 1;
+}
+
+message GetLatencyStatsResponse {
+  LatencyStats stats = 1;
 }
 
 message SaveLogFeaturesRequest {

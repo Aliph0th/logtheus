@@ -25,9 +25,18 @@ class ModelPrediction:
 
 
 class LogAttributeExtractor:
-    def __init__(self, model_dir: str, confidence_threshold: float, embedding_model_dir: str) -> None:
+    def __init__(
+        self,
+        model_dir: str,
+        confidence_threshold: float,
+        embedding_model_dir: str,
+        ner_batch_size: int = 16,
+        embedding_batch_size: int = 32,
+    ) -> None:
         self.model_dir = Path(model_dir)
         self.confidence_threshold = confidence_threshold
+        self.ner_batch_size = max(1, ner_batch_size)
+        self.embedding_batch_size = max(1, embedding_batch_size)
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_dir,
@@ -43,22 +52,49 @@ class LogAttributeExtractor:
 
         self.embedding_model = SentenceTransformer(embedding_model_dir, local_files_only=True)
 
-    def predict(self, text: str) -> ModelPrediction:
-        encoded = self.tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256,
-            return_offsets_mapping=True,
-        )
-        offsets = encoded.pop("offset_mapping")[0].tolist()
+    def predict_batch(self, texts: list[str]) -> list[ModelPrediction]:
+        if not texts:
+            return []
 
-        with torch.no_grad():
-            output = self.model(**encoded, output_hidden_states=True)
-        logits = output.logits[0]
-        probs = torch.softmax(logits, dim=-1)
-        pred_ids = torch.argmax(probs, dim=-1).tolist()
-        pred_scores = torch.max(probs, dim=-1).values.tolist()
+        predictions: list[ModelPrediction] = []
+        for start in range(0, len(texts), self.ner_batch_size):
+            chunk = texts[start:start + self.ner_batch_size]
+            encoded = self.tokenizer(
+                chunk,
+                return_tensors="pt",
+                truncation=True,
+                max_length=512,
+                padding=True,
+                return_offsets_mapping=True,
+            )
+
+            offsets_batch = encoded.pop("offset_mapping").tolist()
+            with torch.no_grad():
+                output = self.model(**encoded)
+
+            probs = torch.softmax(output.logits, dim=-1)
+            pred_ids_batch = torch.argmax(probs, dim=-1).tolist()
+            pred_scores_batch = torch.max(probs, dim=-1).values.tolist()
+
+            for idx, text in enumerate(chunk):
+                predictions.append(
+                    self._build_prediction(
+                        text=text,
+                        pred_ids=pred_ids_batch[idx],
+                        pred_scores=pred_scores_batch[idx],
+                        offsets=offsets_batch[idx],
+                    )
+                )
+
+        return predictions
+
+    def _build_prediction(
+        self,
+        text: str,
+        pred_ids: list[int],
+        pred_scores: list[float],
+        offsets: list[list[int]],
+    ) -> ModelPrediction:
 
         grouped_values: dict[str, list[str]] = defaultdict(list)
         grouped_scores: dict[str, list[float]] = defaultdict(list)
@@ -99,7 +135,12 @@ class LogAttributeExtractor:
                 flush_current()
                 continue
 
-            prefix, entity = label.split("-", maxsplit=1)
+            parts = label.split("-", maxsplit=1)
+            if len(parts) == 2:
+                prefix, entity = parts
+            else:
+                prefix = "B"
+                entity = label
 
             if prefix == "B" or (current_label is not None and current_label != entity):
                 flush_current()
@@ -153,9 +194,18 @@ class LogAttributeExtractor:
             model_version=self.model_version,
         )
 
-    def encode_embedding(self, text: str) -> list[float]:
-        embedding = self.embedding_model.encode(text, convert_to_tensor=True)
-        return embedding.to(dtype=torch.float16).tolist()
+    def encode_embeddings(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        embeddings = self.embedding_model.encode(
+            texts,
+            convert_to_tensor=True,
+            batch_size=self.embedding_batch_size,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return embeddings.tolist()
 
 
 def ensure_model_downloaded(

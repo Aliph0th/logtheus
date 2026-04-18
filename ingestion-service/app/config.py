@@ -22,6 +22,8 @@ class AppConfig:
     model_revision: str
     model_hf_token: str
     model_confidence_threshold: float
+    ml_ner_batch_size: int
+    ml_embedding_batch_size: int
     ingest_worker_count: int
     ingest_queue_size: int
 
@@ -51,6 +53,8 @@ def load_config() -> AppConfig:
         model_hf_token=os.getenv("LOG_MODEL_HF_TOKEN", "").strip(),
         model_confidence_threshold=float(
             os.getenv("LOG_MODEL_CONFIDENCE_THRESHOLD", "0.75")),
+        ml_ner_batch_size=int(os.getenv("ML_NER_BATCH_SIZE", "16")),
+        ml_embedding_batch_size=int(os.getenv("ML_EMBEDDING_BATCH_SIZE", "32")),
         ingest_worker_count=int(os.getenv("INGEST_WORKER_COUNT", "2")),
         ingest_queue_size=int(os.getenv("INGEST_QUEUE_SIZE", "2000")),
     )
