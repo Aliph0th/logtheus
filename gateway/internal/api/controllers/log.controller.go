@@ -121,3 +121,101 @@ func (c *LogController) GetLatencyStats(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{"stats": response.Stats})
 }
+
+func (c *LogController) StartClusteringJob(ctx *gin.Context) {
+	data := utils.MustDTO[*dto.LogClusteringStartRequest](ctx)
+	request, err := data.ToProtoRequest()
+	if err != nil {
+		excepts.RespondError(ctx, excepts.WithBadRequest(err.Error()))
+		return
+	}
+
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, grpcErr := c.logEngineClient.StartClusteringJob(grpcCtx, request)
+	if grpcErr != nil {
+		excepts.RespondError(ctx, grpcErr)
+		return
+	}
+
+	ctx.JSON(http.StatusAccepted, gin.H{
+		"job_id":          response.JobId,
+		"status":          response.Status.String(),
+		"reused_existing": response.ReusedExisting,
+	})
+}
+
+func (c *LogController) GetClusteringJobStatus(ctx *gin.Context) {
+	jobID := ctx.Param("job_id")
+
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, grpcErr := c.logEngineClient.GetClusteringJobStatus(grpcCtx, &logEngineProto.GetClusteringJobStatusRequest{JobId: jobID})
+	if grpcErr != nil {
+		excepts.RespondError(ctx, grpcErr)
+		return
+	}
+
+	payload := gin.H{
+		"job_id":           response.JobId,
+		"status":           response.Status.String(),
+		"progress_percent": response.ProgressPercent,
+		"total_points":     response.TotalPoints,
+		"cluster_count":    response.ClusterCount,
+		"noise_count":      response.NoiseCount,
+		"error_message":    response.ErrorMessage,
+		"created_at":       "",
+		"started_at":       nil,
+		"finished_at":      nil,
+		"expires_at":       "",
+	}
+
+	if response.CreatedAt != nil {
+		payload["created_at"] = response.CreatedAt.AsTime().UTC().Format(time.RFC3339)
+	}
+	if response.StartedAt != nil {
+		payload["started_at"] = response.StartedAt.AsTime().UTC().Format(time.RFC3339)
+	}
+	if response.FinishedAt != nil {
+		payload["finished_at"] = response.FinishedAt.AsTime().UTC().Format(time.RFC3339)
+	}
+	if response.ExpiresAt != nil {
+		payload["expires_at"] = response.ExpiresAt.AsTime().UTC().Format(time.RFC3339)
+	}
+
+	ctx.JSON(http.StatusOK, payload)
+}
+
+func (c *LogController) GetClusteringJobResult(ctx *gin.Context) {
+	jobID := ctx.Param("job_id")
+	data := utils.MustDTO[*dto.LogClusteringResultQuery](ctx)
+
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, grpcErr := c.logEngineClient.GetClusteringJobResult(grpcCtx, data.ToProtoRequest(jobID))
+	if grpcErr != nil {
+		excepts.RespondError(ctx, grpcErr)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"job_id":      response.JobId,
+		"status":      response.Status.String(),
+		"total_items": response.TotalItems,
+		"assignments": response.Assignments,
+		"clusters":    response.Clusters,
+	})
+}
+
+func (c *LogController) CancelClusteringJob(ctx *gin.Context) {
+	jobID := ctx.Param("job_id")
+
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, grpcErr := c.logEngineClient.CancelClusteringJob(grpcCtx, &logEngineProto.CancelClusteringJobRequest{JobId: jobID})
+	if grpcErr != nil {
+		excepts.RespondError(ctx, grpcErr)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"canceled": response.Canceled,
+		"status":   response.Status.String(),
+	})
+}

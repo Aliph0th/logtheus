@@ -27,6 +27,7 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	//Repositories
 	_ = c.Provide(repository.NewLogRepository)
 	_ = c.Provide(repository.NewLogFeatureRepository)
+	_ = c.Provide(repository.NewClusteringJobRepository)
 
 	//Services
 	_ = c.Provide(services.NewLogIdentityService)
@@ -35,6 +36,8 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	_ = c.Provide(services.NewS3Service)
 	_ = c.Provide(services.NewLogsConsumer)
 	_ = c.Provide(services.NewLogFeaturesConsumer)
+	_ = c.Provide(services.NewClusteringService)
+	_ = c.Provide(services.NewClusteringCleanupService)
 
 	//Interceptors
 	_ = c.Provide(interceptors.NewAuthInterceptor)

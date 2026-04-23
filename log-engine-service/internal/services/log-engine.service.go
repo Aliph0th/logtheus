@@ -17,6 +17,7 @@ import (
 type LogEngineService struct {
 	cfg         *config.AppConfig
 	repo        *repository.LogRepository
+	featureRepo *repository.LogFeatureRepository
 	s3          *S3Service
 	logIdentity *LogIdentityService
 }
@@ -24,12 +25,14 @@ type LogEngineService struct {
 func NewLogEngineService(
 	cfg *config.AppConfig,
 	repo *repository.LogRepository,
+	featureRepo *repository.LogFeatureRepository,
 	s3 *S3Service,
 	logIdentity *LogIdentityService,
 ) *LogEngineService {
 	return &LogEngineService{
 		cfg:         cfg,
 		repo:        repo,
+		featureRepo: featureRepo,
 		s3:          s3,
 		logIdentity: logIdentity,
 	}

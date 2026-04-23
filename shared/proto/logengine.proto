@@ -59,6 +59,18 @@ service LogEngineService {
 
   // Latency percentiles from canonical attributes.duration.
   rpc GetLatencyStats(GetLatencyStatsRequest) returns (GetLatencyStatsResponse);
+
+  // Start async clustering job for log embeddings.
+  rpc StartClusteringJob(StartClusteringJobRequest) returns (StartClusteringJobResponse);
+
+  // Get clustering job status and progress.
+  rpc GetClusteringJobStatus(GetClusteringJobStatusRequest) returns (GetClusteringJobStatusResponse);
+
+  // Get paged clustering job result.
+  rpc GetClusteringJobResult(GetClusteringJobResultRequest) returns (GetClusteringJobResultResponse);
+
+  // Cancel queued or running clustering job.
+  rpc CancelClusteringJob(CancelClusteringJobRequest) returns (CancelClusteringJobResponse);
 }
 
 message TimeSeriesPoint {
@@ -106,6 +118,94 @@ message GetLatencyStatsResponse {
 
 message SaveLogFeaturesRequest {
   repeated LogFeatureItem features = 1;
+}
+
+enum ClusteringJobStatus {
+  CLUSTERING_JOB_STATUS_UNSPECIFIED = 0;
+  CLUSTERING_JOB_STATUS_QUEUED = 1;
+  CLUSTERING_JOB_STATUS_RUNNING = 2;
+  CLUSTERING_JOB_STATUS_SUCCEEDED = 3;
+  CLUSTERING_JOB_STATUS_FAILED = 4;
+  CLUSTERING_JOB_STATUS_CANCELED = 5;
+  CLUSTERING_JOB_STATUS_EXPIRED = 6;
+}
+
+message ClusteringFilter {
+  uint64 project_id = 1;
+  optional uint64 application_id = 2;
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+}
+
+message ClusteringParams {
+  double eps = 2;
+  uint32 min_points = 3;
+  uint32 max_points = 4;
+}
+
+message ClusteringAssignmentItem {
+  string log_id = 1;
+  int32 cluster_id = 2;
+}
+
+message ClusteringClusterSummaryItem {
+  int32 cluster_id = 1;
+  uint32 size = 2;
+}
+
+message StartClusteringJobRequest {
+  ClusteringFilter filter = 1;
+  ClusteringParams params = 2;
+  string request_key = 3;
+  uint32 ttl_hours = 4;
+  string cluster_by = 5;
+}
+
+message StartClusteringJobResponse {
+  string job_id = 1;
+  ClusteringJobStatus status = 2;
+  bool reused_existing = 3;
+}
+
+message GetClusteringJobStatusRequest {
+  string job_id = 1;
+}
+
+message GetClusteringJobStatusResponse {
+  string job_id = 1;
+  ClusteringJobStatus status = 2;
+  double progress_percent = 3;
+  uint32 total_points = 4;
+  uint32 cluster_count = 5;
+  uint32 noise_count = 6;
+  string error_message = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+  google.protobuf.Timestamp expires_at = 11;
+}
+
+message GetClusteringJobResultRequest {
+  string job_id = 1;
+  uint32 offset = 2;
+  uint32 limit = 3;
+}
+
+message GetClusteringJobResultResponse {
+  string job_id = 1;
+  ClusteringJobStatus status = 2;
+  uint32 total_items = 3;
+  repeated ClusteringAssignmentItem assignments = 4;
+  repeated ClusteringClusterSummaryItem clusters = 5;
+}
+
+message CancelClusteringJobRequest {
+  string job_id = 1;
+}
+
+message CancelClusteringJobResponse {
+  bool canceled = 1;
+  ClusteringJobStatus status = 2;
 }
 
 message SaveLogsRequest {

@@ -8,12 +8,14 @@ import (
 
 type LogEngineHandler struct {
 	logEngineProto.UnimplementedLogEngineServiceServer
-	logEngineService *services.LogEngineService
+	logEngineService  *services.LogEngineService
+	clusteringService *services.ClusteringService
 }
 
-func NewLogEngineHandler(logEngineService *services.LogEngineService) *LogEngineHandler {
+func NewLogEngineHandler(logEngineService *services.LogEngineService, clusteringService *services.ClusteringService) *LogEngineHandler {
 	return &LogEngineHandler{
-		logEngineService: logEngineService,
+		logEngineService:  logEngineService,
+		clusteringService: clusteringService,
 	}
 }
 
@@ -60,4 +62,20 @@ func (h *LogEngineHandler) GetLatencyStats(ctx context.Context, req *logEnginePr
 	return &logEngineProto.GetLatencyStatsResponse{
 		Stats: stats,
 	}, nil
+}
+
+func (h *LogEngineHandler) StartClusteringJob(ctx context.Context, req *logEngineProto.StartClusteringJobRequest) (*logEngineProto.StartClusteringJobResponse, error) {
+	return h.clusteringService.StartClusteringJob(ctx, req)
+}
+
+func (h *LogEngineHandler) GetClusteringJobStatus(ctx context.Context, req *logEngineProto.GetClusteringJobStatusRequest) (*logEngineProto.GetClusteringJobStatusResponse, error) {
+	return h.clusteringService.GetClusteringJobStatus(ctx, req)
+}
+
+func (h *LogEngineHandler) GetClusteringJobResult(ctx context.Context, req *logEngineProto.GetClusteringJobResultRequest) (*logEngineProto.GetClusteringJobResultResponse, error) {
+	return h.clusteringService.GetClusteringJobResult(ctx, req)
+}
+
+func (h *LogEngineHandler) CancelClusteringJob(ctx context.Context, req *logEngineProto.CancelClusteringJobRequest) (*logEngineProto.CancelClusteringJobResponse, error) {
+	return h.clusteringService.CancelClusteringJob(ctx, req)
 }

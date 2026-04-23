@@ -54,4 +54,35 @@ func RegisterLogRoutes(api *gin.RouterGroup, container *dig.Container) {
 			controller.GetLatencyStats,
 		)...)
 	}
+
+	clustering := api.Group("/logs/clustering")
+	{
+		clustering.Use(authMiddleware)
+
+		clustering.POST("/jobs", append(
+			validators.LogClusteringStartBodyValidators,
+			middleware.ValidationMiddleware,
+			middleware.BindDTO[*dto.LogClusteringStartRequest](),
+			controller.StartClusteringJob,
+		)...)
+
+		clustering.GET("/jobs/:job_id", append(
+			validators.LogClusteringJobIDValidators,
+			middleware.ValidationMiddleware,
+			controller.GetClusteringJobStatus,
+		)...)
+
+		clustering.GET("/jobs/:job_id/result", append(
+			append(validators.LogClusteringJobIDValidators, validators.LogClusteringResultValidators...),
+			middleware.ValidationMiddleware,
+			middleware.BindDTO[*dto.LogClusteringResultQuery](),
+			controller.GetClusteringJobResult,
+		)...)
+
+		clustering.DELETE("/jobs/:job_id", append(
+			validators.LogClusteringJobIDValidators,
+			middleware.ValidationMiddleware,
+			controller.CancelClusteringJob,
+		)...)
+	}
 }

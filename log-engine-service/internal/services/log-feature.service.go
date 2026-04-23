@@ -9,6 +9,7 @@ import (
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
+	"time"
 
 	"github.com/pgvector/pgvector-go"
 )
@@ -36,6 +37,11 @@ func (s *LogFeatureService) SaveFeatures(ctx context.Context, req *logEngineProt
 			return grpc.WithInvalidArgument("invalid attributes payload").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
 		}
 
+		createdAt := time.Now().UTC()
+		if feature.ReceivedAt != nil {
+			createdAt = feature.ReceivedAt.AsTime().UTC()
+		}
+
 		logID := s.logIdentity.BuildLogIDFromRawHash(
 			feature.ProjectId,
 			feature.ApplicationId,
@@ -49,6 +55,7 @@ func (s *LogFeatureService) SaveFeatures(ctx context.Context, req *logEngineProt
 			ProjectID:     feature.ProjectId,
 			Embedding:     pgvector.NewVector(feature.Embedding),
 			Attributes:    json.RawMessage(attributesJSON),
+			CreatedAt:     createdAt,
 		})
 	}
 

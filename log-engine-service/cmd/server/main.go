@@ -37,6 +37,7 @@ func main() {
 
 	logsConsumer := utils.MustResolve[*services.LogsConsumer](container)
 	logFeaturesConsumer := utils.MustResolve[*services.LogFeaturesConsumer](container)
+	clusteringCleanupService := utils.MustResolve[*services.ClusteringCleanupService](container)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -57,7 +58,12 @@ func main() {
 			slog.Error("Failed to migrate ClickHouse", sl.Error(err))
 			os.Exit(1)
 		}
-		if err := featuresDB.Migrate(&models.LogFeature{}); err != nil {
+		if err := featuresDB.Migrate(
+			&models.LogFeature{},
+			&models.ClusteringJob{},
+			&models.ClusteringAssignment{},
+			&models.ClusteringClusterSummary{},
+		); err != nil {
 			slog.Error("Failed to migrate Postgres", sl.Error(err))
 			os.Exit(1)
 		}
@@ -65,6 +71,7 @@ func main() {
 
 	logsConsumer.Start(ctx)
 	logFeaturesConsumer.Start(ctx)
+	clusteringCleanupService.Start(ctx)
 
 	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {
 		slog.Error("Failed to start gRPC server", sl.Error(err))
