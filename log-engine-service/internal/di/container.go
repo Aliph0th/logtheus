@@ -6,7 +6,9 @@ import (
 	"logtheus/logengine/internal/repository"
 	"logtheus/logengine/internal/services"
 	"logtheus/logengine/internal/storages"
+	"logtheus/shared/pkg/clients"
 	"logtheus/shared/pkg/interceptors"
+	projectProto "logtheus/shared/pkg/pb/v1/project"
 	sharedStorages "logtheus/shared/pkg/storages"
 
 	"go.uber.org/dig"
@@ -22,6 +24,9 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	})
 	_ = c.Provide(func(cfg *config.AppConfig) (*sharedStorages.Database, error) {
 		return sharedStorages.NewPostgres(cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.Password, cfg.Postgres.Name)
+	})
+	_ = c.Provide(func(cfg *config.AppConfig) projectProto.ProjectServiceClient {
+		return clients.NewProjectClient(cfg.Services.Project)
 	})
 
 	//Repositories

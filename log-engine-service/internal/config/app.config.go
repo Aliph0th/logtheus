@@ -35,5 +35,7 @@ type AppConfig struct {
 		Mechanism string `mapstructure:"KAFKA_MECHANISM"`
 	} `mapstructure:",squash"`
 
-	Services struct{} `mapstructure:",squash"`
+	Services struct {
+		Project string `mapstructure:"PROJECT_SERVICE"`
+	} `mapstructure:",squash"`
 }

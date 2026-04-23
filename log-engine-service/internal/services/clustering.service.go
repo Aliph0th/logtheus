@@ -12,6 +12,7 @@ import (
 	sharedConsts "logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
+	projectProto "logtheus/shared/pkg/pb/v1/project"
 	"sort"
 	"strings"
 	"time"
@@ -23,16 +24,22 @@ import (
 type ClusteringService struct {
 	clusteringRepo *repository.ClusteringJobRepository
 	featureRepo    *repository.LogFeatureRepository
+	projectClient  projectProto.ProjectServiceClient
 }
 
 func NewClusteringService(
 	clusteringRepo *repository.ClusteringJobRepository,
 	featureRepo *repository.LogFeatureRepository,
+	projectClient projectProto.ProjectServiceClient,
 ) *ClusteringService {
-	return &ClusteringService{clusteringRepo: clusteringRepo, featureRepo: featureRepo}
+	return &ClusteringService{clusteringRepo: clusteringRepo, featureRepo: featureRepo, projectClient: projectClient}
 }
 
 func (s *ClusteringService) StartClusteringJob(ctx context.Context, req *logEngineProto.StartClusteringJobRequest) (*logEngineProto.StartClusteringJobResponse, error) {
+	if accessErr := utils.EnsureProjectWriteAccess(ctx, req.GetFilter().GetProjectId(), s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+
 	params := utils.NormalizeClusteringParams(req)
 	clusterBy := utils.NormalizeClusterBy(req.GetClusterBy())
 
@@ -101,6 +108,9 @@ func (s *ClusteringService) GetClusteringJobStatus(ctx context.Context, req *log
 	if job == nil {
 		return nil, grpc.WithNotFound("clustering job not found")
 	}
+	if accessErr := utils.EnsureProjectReadAccess(ctx, job.ProjectID, s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
 
 	var startedAt, finishedAt *timestamppb.Timestamp
 	if job.StartedAt != nil {
@@ -135,6 +145,9 @@ func (s *ClusteringService) GetClusteringJobResult(ctx context.Context, req *log
 	}
 	if job == nil {
 		return nil, grpc.WithNotFound("clustering job not found")
+	}
+	if accessErr := utils.EnsureProjectReadAccess(ctx, job.ProjectID, s.projectClient); accessErr != nil {
+		return nil, accessErr
 	}
 	if time.Now().UTC().After(job.ExpiresAt) {
 		return nil, grpc.WithNotFound("clustering job result expired").WithSlug(sharedConsts.ERROR_CODE_CLUSTERING_EXPIRED)
@@ -191,17 +204,27 @@ func (s *ClusteringService) CancelClusteringJob(ctx context.Context, req *logEng
 	jobIDStr := strings.TrimSpace(req.GetJobId())
 	jobID, _ := uuid.Parse(jobIDStr)
 
-	canceled, repoErr := s.clusteringRepo.MarkCanceled(ctx, jobID, time.Now().UTC())
-	if repoErr != nil {
-		return nil, grpc.WithInternal(repoErr).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_CLUSTERING_FAILED)
-	}
-
 	job, repoErr := s.clusteringRepo.GetByID(ctx, jobID)
 	if repoErr != nil {
 		return nil, grpc.WithInternal(repoErr).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_CLUSTERING_FAILED)
 	}
 	if job == nil {
 		return nil, grpc.WithNotFound("clustering job not found")
+	}
+	if accessErr := utils.EnsureProjectWriteAccess(ctx, job.ProjectID, s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+	job, repoErr = s.clusteringRepo.GetByID(ctx, jobID)
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_CLUSTERING_FAILED)
+	}
+	if job == nil {
+		return nil, grpc.WithNotFound("clustering job not found")
+	}
+
+	canceled, repoErr := s.clusteringRepo.MarkCanceled(ctx, jobID, time.Now().UTC())
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_CLUSTERING_FAILED)
 	}
 
 	return &logEngineProto.CancelClusteringJobResponse{

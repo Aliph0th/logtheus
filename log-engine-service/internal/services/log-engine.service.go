@@ -10,31 +10,35 @@ import (
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
+	projectProto "logtheus/shared/pkg/pb/v1/project"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type LogEngineService struct {
-	cfg         *config.AppConfig
-	repo        *repository.LogRepository
-	featureRepo *repository.LogFeatureRepository
-	s3          *S3Service
-	logIdentity *LogIdentityService
+	cfg           *config.AppConfig
+	repo          *repository.LogRepository
+	featureRepo   *repository.LogFeatureRepository
+	projectClient projectProto.ProjectServiceClient
+	s3            *S3Service
+	logIdentity   *LogIdentityService
 }
 
 func NewLogEngineService(
 	cfg *config.AppConfig,
 	repo *repository.LogRepository,
 	featureRepo *repository.LogFeatureRepository,
+	projectClient projectProto.ProjectServiceClient,
 	s3 *S3Service,
 	logIdentity *LogIdentityService,
 ) *LogEngineService {
 	return &LogEngineService{
-		cfg:         cfg,
-		repo:        repo,
-		featureRepo: featureRepo,
-		s3:          s3,
-		logIdentity: logIdentity,
+		cfg:           cfg,
+		repo:          repo,
+		featureRepo:   featureRepo,
+		projectClient: projectClient,
+		s3:            s3,
+		logIdentity:   logIdentity,
 	}
 }
 
@@ -93,6 +97,10 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 }
 
 func (s *LogEngineService) GetVolumeSeries(ctx context.Context, req *logEngineProto.GetVolumeSeriesRequest) ([]*logEngineProto.TimeSeriesPoint, error) {
+	if accessErr := utils.EnsureProjectReadAccess(ctx, req.GetFilter().GetProjectId(), s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+
 	rows, repoErr := s.repo.GetVolumeSeries(ctx, req.Filter, req.Bucket)
 	if repoErr != nil {
 		return nil, grpc.WithInternal(repoErr).WithSlug(consts.INTERNAL_ERROR_AGGREGATION_FAILED)
@@ -110,6 +118,10 @@ func (s *LogEngineService) GetVolumeSeries(ctx context.Context, req *logEnginePr
 }
 
 func (s *LogEngineService) GetAggregationByField(ctx context.Context, req *logEngineProto.GetAggregationRequest) ([]*logEngineProto.AggregationItem, error) {
+	if accessErr := utils.EnsureProjectReadAccess(ctx, req.GetFilter().GetProjectId(), s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+
 	if _, ok := utils.AggregationFieldExpression(req.GetField()); !ok {
 		return nil, grpc.WithInvalidArgument("unsupported aggregation field").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
 	}
@@ -136,6 +148,10 @@ func (s *LogEngineService) GetAggregationByField(ctx context.Context, req *logEn
 }
 
 func (s *LogEngineService) GetLatencyStats(ctx context.Context, req *logEngineProto.GetLatencyStatsRequest) (*logEngineProto.LatencyStats, error) {
+	if accessErr := utils.EnsureProjectReadAccess(ctx, req.GetFilter().GetProjectId(), s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+
 	stats, repoErr := s.repo.GetLatencyStats(ctx, req.Filter)
 	if repoErr != nil {
 		return nil, grpc.WithInternal(repoErr).WithSlug(consts.INTERNAL_ERROR_AGGREGATION_FAILED)
