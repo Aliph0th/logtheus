@@ -26,6 +26,12 @@ class AppConfig:
     ml_embedding_batch_size: int
     ingest_worker_count: int
     ingest_queue_size: int
+    ingest_overload_high_watermark: float
+    ingest_per_project_queue_limit: int
+    ingest_retry_after_ms: int
+    ingest_kafka_batch_max_logs: int
+    ingest_kafka_batch_max_bytes: int
+    ingest_kafka_batch_max_wait_ms: int
 
 
 def load_config() -> AppConfig:
@@ -57,4 +63,15 @@ def load_config() -> AppConfig:
         ml_embedding_batch_size=int(os.getenv("ML_EMBEDDING_BATCH_SIZE", "32")),
         ingest_worker_count=int(os.getenv("INGEST_WORKER_COUNT", "2")),
         ingest_queue_size=int(os.getenv("INGEST_QUEUE_SIZE", "2000")),
+        ingest_overload_high_watermark=float(
+            os.getenv("INGEST_OVERLOAD_HIGH_WATERMARK", "0.9")),
+        ingest_per_project_queue_limit=int(
+            os.getenv("INGEST_PER_PROJECT_QUEUE_LIMIT", "200")),
+        ingest_retry_after_ms=int(os.getenv("INGEST_RETRY_AFTER_MS", "500")),
+        ingest_kafka_batch_max_logs=int(
+            os.getenv("INGEST_KAFKA_BATCH_MAX_LOGS", "1000")),
+        ingest_kafka_batch_max_bytes=int(
+            os.getenv("INGEST_KAFKA_BATCH_MAX_BYTES", "1048576")),
+        ingest_kafka_batch_max_wait_ms=int(
+            os.getenv("INGEST_KAFKA_BATCH_MAX_WAIT_MS", "200")),
     )

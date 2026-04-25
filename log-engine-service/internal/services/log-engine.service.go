@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"logtheus/logengine/internal/config"
 	"logtheus/logengine/internal/models"
 	"logtheus/logengine/internal/repository"
@@ -55,45 +56,69 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 	// 	}
 	// }
 
-	s3Key, err := s.s3.UploadBatch(ctx, req.Logs)
-	if err != nil {
-		return grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_UPLOAD_FAILED)
-	}
-
-	logRecords := make([]*models.LogRecord, 0, len(req.Logs))
+	groups := make(map[string][]*logEngineProto.LogItem)
 	for _, item := range req.Logs {
-		//TODO: validate?
-		logID := s.logIdentity.BuildLogIDFromRawData(
-			item.ProjectId,
-			item.ApplicationId,
-			item.SourceIp,
-			item.RawData,
-		)
-
-		attributesJSON, marshalErr := json.Marshal(item.Attributes)
-		if marshalErr != nil {
-			return grpc.WithInvalidArgument("Invalid attributes payload").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
-		}
-
-		logRecords = append(logRecords, &models.LogRecord{
-			LogID:           logID,
-			ApplicationID:   item.ApplicationId,
-			ApplicationName: item.ApplicationName,
-			ProjectID:       item.ProjectId,
-			Format:          item.Format,
-			SourceIP:        item.SourceIp,
-			ReceivedAt:      item.ReceivedAt.AsTime().UTC(),
-			Attributes:      json.RawMessage(attributesJSON),
-			S3Key:           s3Key,
-		})
+		groupKey := buildGroupKey(item.ProjectId, item.ApplicationId)
+		groups[groupKey] = append(groups[groupKey], item)
 	}
 
-	if err := s.repo.SaveBatch(ctx, logRecords); err != nil {
-		_ = s.s3.DeleteObject(ctx, s3Key)
+	allRecords := make([]*models.LogRecord, 0, len(req.Logs))
+	uploadedS3Keys := make([]string, 0, len(groups))
+
+	for _, groupLogs := range groups {
+		s3Key, err := s.s3.UploadBatch(ctx, groupLogs)
+		if err != nil {
+			for _, prevS3Key := range uploadedS3Keys {
+				_ = s.s3.DeleteObject(ctx, prevS3Key)
+			}
+			return grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_UPLOAD_FAILED)
+		}
+		uploadedS3Keys = append(uploadedS3Keys, s3Key)
+
+		for _, item := range groupLogs {
+			//TODO: validate?
+			logID := s.logIdentity.BuildLogIDFromRawData(
+				item.ProjectId,
+				item.ApplicationId,
+				item.SourceIp,
+				item.RawData,
+			)
+
+			attributesJSON, marshalErr := json.Marshal(item.Attributes)
+			if marshalErr != nil {
+				for _, prevS3Key := range uploadedS3Keys {
+					_ = s.s3.DeleteObject(ctx, prevS3Key)
+				}
+				return grpc.WithInvalidArgument("Invalid attributes payload").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
+			}
+
+			allRecords = append(allRecords, &models.LogRecord{
+				LogID:           logID,
+				ApplicationID:   item.ApplicationId,
+				ApplicationName: item.ApplicationName,
+				ProjectID:       item.ProjectId,
+				Format:          item.Format,
+				SourceIP:        item.SourceIp,
+				ReceivedAt:      item.ReceivedAt.AsTime().UTC(),
+				Attributes:      json.RawMessage(attributesJSON),
+				S3Key:           s3Key,
+			})
+		}
+	}
+
+	batchSize := s.cfg.Persistence.LogsCHInsertBatchSize
+	if err := s.repo.SaveBatchInChunks(ctx, allRecords, batchSize); err != nil {
+		for _, s3Key := range uploadedS3Keys {
+			_ = s.s3.DeleteObject(ctx, s3Key)
+		}
 		return grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
 	}
 
 	return nil
+}
+
+func buildGroupKey(projectID uint64, applicationID uint64) string {
+	return fmt.Sprintf("%d:%d", projectID, applicationID)
 }
 
 func (s *LogEngineService) GetVolumeSeries(ctx context.Context, req *logEngineProto.GetVolumeSeriesRequest) ([]*logEngineProto.TimeSeriesPoint, error) {

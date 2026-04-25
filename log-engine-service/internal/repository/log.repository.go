@@ -53,6 +53,22 @@ func (r *LogRepository) SaveBatch(ctx context.Context, logs []*models.LogRecord)
 	return nil
 }
 
+func (r *LogRepository) SaveBatchInChunks(ctx context.Context, logs []*models.LogRecord, chunkSize int) error {
+	if len(logs) == 0 {
+		return nil
+	}
+
+	if chunkSize <= 0 {
+		chunkSize = len(logs)
+	}
+
+	if err := r.ch.DB.WithContext(ctx).CreateInBatches(logs, chunkSize).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *LogRepository) Delete(ctx context.Context, log *models.LogRecord) error {
 	if err := r.ch.DB.WithContext(ctx).Delete(log).Error; err != nil {
 		return err

@@ -23,3 +23,6 @@ __pycache__/
 shared/pkg/pb
 ingestion-service/app/proto
 ingestion-service/models
+
+.codex
+graphify-out

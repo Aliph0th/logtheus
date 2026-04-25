@@ -19,6 +19,10 @@ import (
 type LogFeaturesConsumer struct {
 	service *LogFeatureService
 	reader  *kafka.Reader
+
+	batchMaxMessages int
+	batchMaxBytes    int
+	batchMaxWait     time.Duration
 }
 
 func NewLogFeaturesConsumer(cfg *config.AppConfig, service *LogFeatureService) *LogFeaturesConsumer {
@@ -38,7 +42,17 @@ func NewLogFeaturesConsumer(cfg *config.AppConfig, service *LogFeatureService) *
 		Dialer:   dialer,
 	})
 
-	return &LogFeaturesConsumer{service: service, reader: reader}
+	batchMaxMessages := cfg.Kafka.FeaturesConsumerBatchMaxMessages
+	batchMaxBytes := cfg.Kafka.FeaturesConsumerBatchMaxBytes
+	batchMaxWait := time.Duration(cfg.Kafka.FeaturesConsumerBatchMaxWaitMs) * time.Millisecond
+
+	return &LogFeaturesConsumer{
+		service:          service,
+		reader:           reader,
+		batchMaxMessages: batchMaxMessages,
+		batchMaxBytes:    batchMaxBytes,
+		batchMaxWait:     batchMaxWait,
+	}
 }
 
 func (c *LogFeaturesConsumer) Start(ctx context.Context) {
@@ -47,10 +61,52 @@ func (c *LogFeaturesConsumer) Start(ctx context.Context) {
 }
 
 func (c *LogFeaturesConsumer) consume(ctx context.Context) {
+	ticker := time.NewTicker(c.batchMaxWait)
+	defer ticker.Stop()
+
+	messagesBatch := make([]kafka.Message, 0, c.batchMaxMessages)
+	requestsBatch := make([]logEngineProto.SaveLogFeaturesRequest, 0, c.batchMaxMessages)
+	batchBytes := 0
+
+	flush := func() bool {
+		if len(messagesBatch) == 0 {
+			return true
+		}
+
+		for index := range requestsBatch {
+			if err := c.service.SaveFeatures(ctx, &requestsBatch[index]); err != nil {
+				slog.Error("Failed to persist log features batch", sl.Error(err))
+				time.Sleep(500 * time.Millisecond)
+				return false
+			}
+		}
+
+		if err := c.reader.CommitMessages(ctx, messagesBatch...); err != nil {
+			slog.Error("Failed to commit log features batch events", sl.Error(err))
+			time.Sleep(500 * time.Millisecond)
+			return false
+		}
+
+		messagesBatch = messagesBatch[:0]
+		requestsBatch = requestsBatch[:0]
+		batchBytes = 0
+		return true
+	}
+
 	for {
+		select {
+		case <-ctx.Done():
+			_ = flush()
+			return
+		case <-ticker.C:
+			_ = flush()
+		default:
+		}
+
 		message, err := c.reader.FetchMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
+				_ = flush()
 				return
 			}
 			slog.Error("Failed to read log features event", sl.Error(err))
@@ -67,15 +123,12 @@ func (c *LogFeaturesConsumer) consume(ctx context.Context) {
 			continue
 		}
 
-		if err := c.service.SaveFeatures(ctx, &req); err != nil {
-			slog.Error("Failed to persist log features batch", sl.Error(err))
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
+		messagesBatch = append(messagesBatch, message)
+		requestsBatch = append(requestsBatch, req)
+		batchBytes += len(message.Value)
 
-		if err := c.reader.CommitMessages(ctx, message); err != nil {
-			slog.Error("Failed to commit log features event", sl.Error(err))
-			time.Sleep(500 * time.Millisecond)
+		if len(messagesBatch) >= c.batchMaxMessages || batchBytes >= c.batchMaxBytes {
+			_ = flush()
 		}
 	}
 }

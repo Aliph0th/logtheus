@@ -8,7 +8,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
 from app.constants import MAX_INGESTION_BYTES, LogFormat
-from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError, PreparedLogEntry
+from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError, ProjectQueueFullError, PreparedLogEntry
+from app.kafka_batcher import KafkaPublishBatcher
 from app.kafka_producer import LogsKafkaProducer
 from app.proto import application_pb2, application_pb2_grpc
 from app.proto import ingestion_pb2, ingestion_pb2_grpc
@@ -68,7 +69,16 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         self._worker_pool = IngestWorkerPool(
             worker_count=cfg.ingest_worker_count,
             queue_size=cfg.ingest_queue_size,
+            per_project_queue_limit=cfg.ingest_per_project_queue_limit,
+            overload_high_watermark=cfg.ingest_overload_high_watermark,
             processor=self._process_job,
+        )
+        self._kafka_batcher = KafkaPublishBatcher(
+            max_logs=cfg.ingest_kafka_batch_max_logs,
+            max_bytes=cfg.ingest_kafka_batch_max_bytes,
+            max_wait_ms=cfg.ingest_kafka_batch_max_wait_ms,
+            publish_logs=self._logs_producer.publish,
+            publish_features=self._features_producer.publish,
         )
 
         logging.info(
@@ -79,6 +89,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
 
     def close(self) -> None:
         self._worker_pool.close()
+        self._kafka_batcher.close()
         self._logs_producer.close()
         self._features_producer.close()
         self._app_channel.close()
@@ -123,7 +134,18 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     logs=payloads,
                 )
             )
+        except ProjectQueueFullError:
+            context.set_trailing_metadata(
+                (("retry-after-ms", str(self._cfg.ingest_retry_after_ms)),)
+            )
+            context.abort(
+                grpc.StatusCode.RESOURCE_EXHAUSTED,
+                "Project ingestion quota exceeded, retry later",
+            )
         except QueueFullError:
+            context.set_trailing_metadata(
+                (("retry-after-ms", str(self._cfg.ingest_retry_after_ms)),)
+            )
             context.abort(
                 grpc.StatusCode.RESOURCE_EXHAUSTED,
                 "Ingestion queue is full, retry later",
@@ -214,12 +236,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                 )
             )
 
-        payload = logengine_pb2.SaveLogsRequest(logs=logs).SerializeToString()
-        self._logs_producer.publish(payload)
-
-        featuresPayload = logengine_pb2.SaveLogFeaturesRequest(
-            features=features).SerializeToString()
-        self._features_producer.publish(featuresPayload)
+        self._kafka_batcher.enqueue(logs, features)
 
 
 def serve(cfg: AppConfig) -> None:

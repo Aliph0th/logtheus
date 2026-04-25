@@ -29,10 +29,22 @@ type AppConfig struct {
 	} `mapstructure:",squash"`
 
 	Kafka struct {
-		Brokers   string `mapstructure:"KAFKA_BROKERS"`
-		Username  string `mapstructure:"KAFKA_USERNAME"`
-		Password  string `mapstructure:"KAFKA_PASSWORD"`
-		Mechanism string `mapstructure:"KAFKA_MECHANISM"`
+		Brokers                          string `mapstructure:"KAFKA_BROKERS"`
+		Username                         string `mapstructure:"KAFKA_USERNAME"`
+		Password                         string `mapstructure:"KAFKA_PASSWORD"`
+		Mechanism                        string `mapstructure:"KAFKA_MECHANISM"`
+		LogsConsumerBatchMaxMessages     int    `mapstructure:"LOGS_CONSUMER_BATCH_MAX_MESSAGES"`
+		LogsConsumerBatchMaxBytes        int    `mapstructure:"LOGS_CONSUMER_BATCH_MAX_BYTES"`
+		LogsConsumerBatchMaxWaitMs       int    `mapstructure:"LOGS_CONSUMER_BATCH_MAX_WAIT_MS"`
+		FeaturesConsumerBatchMaxMessages int    `mapstructure:"FEATURES_CONSUMER_BATCH_MAX_MESSAGES"`
+		FeaturesConsumerBatchMaxBytes    int    `mapstructure:"FEATURES_CONSUMER_BATCH_MAX_BYTES"`
+		FeaturesConsumerBatchMaxWaitMs   int    `mapstructure:"FEATURES_CONSUMER_BATCH_MAX_WAIT_MS"`
+	} `mapstructure:",squash"`
+
+	Persistence struct {
+		LogsCHInsertBatchSize int `mapstructure:"LOGS_CH_INSERT_BATCH_SIZE"`
+		LogsDedupeTTLSeconds  int `mapstructure:"LOGS_DEDUPE_TTL_SECONDS"`
+		LogsDedupeCacheSize   int `mapstructure:"LOGS_DEDUPE_CACHE_SIZE"`
 	} `mapstructure:",squash"`
 
 	Services struct {
