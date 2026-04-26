@@ -54,6 +54,7 @@ func (s *LogFeatureService) SaveFeatures(ctx context.Context, req *logEngineProt
 			ApplicationID: feature.ApplicationId,
 			ProjectID:     feature.ProjectId,
 			Embedding:     pgvector.NewVector(feature.Embedding),
+			SimilarCount:  0,
 			Attributes:    json.RawMessage(attributesJSON),
 			CreatedAt:     createdAt,
 		})

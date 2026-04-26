@@ -31,6 +31,10 @@ func (h *LogEngineHandler) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 	}, nil
 }
 
+func (h *LogEngineHandler) CheckSimilarLogs(ctx context.Context, req *logEngineProto.CheckSimilarLogsRequest) (*logEngineProto.CheckSimilarLogsResponse, error) {
+	return h.logEngineService.CheckSimilarLogs(ctx, req)
+}
+
 func (h *LogEngineHandler) GetVolumeSeries(ctx context.Context, req *logEngineProto.GetVolumeSeriesRequest) (*logEngineProto.GetVolumeSeriesResponse, error) {
 	points, err := h.logEngineService.GetVolumeSeries(ctx, req)
 	if err != nil {

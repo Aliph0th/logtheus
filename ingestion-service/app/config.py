@@ -8,6 +8,7 @@ class AppConfig:
     port: int
     env: str
     application_service: str
+    log_engine_service: str
     kafka_brokers: str
     kafka_topic: str
     kafka_features_topic: str
@@ -32,6 +33,9 @@ class AppConfig:
     ingest_kafka_batch_max_logs: int
     ingest_kafka_batch_max_bytes: int
     ingest_kafka_batch_max_wait_ms: int
+    ingest_similarity_min_score: float
+    ingest_similarity_window_days: int
+    ingest_similarity_check_timeout_ms: int
 
 
 def load_config() -> AppConfig:
@@ -41,6 +45,7 @@ def load_config() -> AppConfig:
         port=int(os.getenv("PORT", "50057")),
         env=os.getenv("ENV", "development"),
         application_service=os.getenv("APPLICATION_SERVICE", ""),
+        log_engine_service=os.getenv("LOG_ENGINE_SERVICE", ""),
         kafka_brokers=os.getenv("KAFKA_BROKERS", ""),
         kafka_topic=os.getenv("KAFKA_TOPIC", "logs.ingest.v1"),
         kafka_features_topic=os.getenv(
@@ -74,4 +79,10 @@ def load_config() -> AppConfig:
             os.getenv("INGEST_KAFKA_BATCH_MAX_BYTES", "1048576")),
         ingest_kafka_batch_max_wait_ms=int(
             os.getenv("INGEST_KAFKA_BATCH_MAX_WAIT_MS", "200")),
+        ingest_similarity_min_score=float(
+            os.getenv("INGEST_SIMILARITY_MIN_SCORE", "0.98")),
+        ingest_similarity_window_days=int(
+            os.getenv("INGEST_SIMILARITY_WINDOW_DAYS", "30")),
+        ingest_similarity_check_timeout_ms=int(
+            os.getenv("INGEST_SIMILARITY_CHECK_TIMEOUT_MS", "20")),
     )

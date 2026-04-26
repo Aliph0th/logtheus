@@ -92,6 +92,6 @@ class KafkaPublishBatcher:
         project_key = str(logs[0].project_id).encode("utf-8")
         self._publish_logs(logs_payload, key=project_key)
 
-        features_payload = logengine_pb2.SaveLogFeaturesRequest(features=features).SerializeToString()
-        self._publish_features(features_payload, key=project_key)
-
+        if len(features) > 0:
+            features_payload = logengine_pb2.SaveLogFeaturesRequest(features=features).SerializeToString()
+            self._publish_features(features_payload, key=project_key)

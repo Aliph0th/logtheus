@@ -2,6 +2,8 @@ from enum import Enum
 
 
 MAX_INGESTION_BYTES = 10 * 1024 * 1024
+SIMILAR_REF_LOG_ID_ATTRIBUTE = "similar_ref_log_id"
+SIMILAR_SCORE_ATTRIBUTE = "similar_score"
 
 
 class LogFormat(str, Enum):

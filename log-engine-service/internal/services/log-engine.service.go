@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"logtheus/logengine/internal/config"
+	internalConsts "logtheus/logengine/internal/consts"
 	"logtheus/logengine/internal/models"
 	"logtheus/logengine/internal/repository"
-	"logtheus/logengine/internal/utils"
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
+	"time"
 
+	"logtheus/logengine/internal/utils"
+
+	"github.com/pgvector/pgvector-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -56,8 +60,18 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 	// 	}
 	// }
 
-	groups := make(map[string][]*logEngineProto.LogItem)
+	normalLogs := make([]*logEngineProto.LogItem, 0, len(req.Logs))
+	aggregateOnlyLogs := make([]*logEngineProto.LogItem, 0)
 	for _, item := range req.Logs {
+		if _, isAggregateOnly := item.Attributes[internalConsts.SimilarRefLogIDAttribute]; isAggregateOnly {
+			aggregateOnlyLogs = append(aggregateOnlyLogs, item)
+			continue
+		}
+		normalLogs = append(normalLogs, item)
+	}
+
+	groups := make(map[string][]*logEngineProto.LogItem)
+	for _, item := range normalLogs {
 		groupKey := buildGroupKey(item.ProjectId, item.ApplicationId)
 		groups[groupKey] = append(groups[groupKey], item)
 	}
@@ -93,17 +107,44 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 			}
 
 			allRecords = append(allRecords, &models.LogRecord{
-				LogID:           logID,
-				ApplicationID:   item.ApplicationId,
-				ApplicationName: item.ApplicationName,
-				ProjectID:       item.ProjectId,
-				Format:          item.Format,
-				SourceIP:        item.SourceIp,
-				ReceivedAt:      item.ReceivedAt.AsTime().UTC(),
-				Attributes:      json.RawMessage(attributesJSON),
-				S3Key:           s3Key,
+				LogID:         logID,
+				ApplicationID: item.ApplicationId,
+				ProjectID:     item.ProjectId,
+				Format:        item.Format,
+				SourceIP:      item.SourceIp,
+				ReceivedAt:    item.ReceivedAt.AsTime().UTC(),
+				Attributes:    json.RawMessage(attributesJSON),
+				S3Key:         s3Key,
 			})
 		}
+	}
+
+	for _, item := range aggregateOnlyLogs {
+		logID := s.logIdentity.BuildLogIDFromRawData(
+			item.ProjectId,
+			item.ApplicationId,
+			item.SourceIp,
+			item.RawData,
+		)
+
+		attributesJSON, marshalErr := json.Marshal(item.Attributes)
+		if marshalErr != nil {
+			for _, prevS3Key := range uploadedS3Keys {
+				_ = s.s3.DeleteObject(ctx, prevS3Key)
+			}
+			return grpc.WithInvalidArgument("Invalid attributes payload").WithSlug(consts.ERROR_CODE_VALIDATION_FAILED)
+		}
+
+		allRecords = append(allRecords, &models.LogRecord{
+			LogID:         logID,
+			ApplicationID: item.ApplicationId,
+			ProjectID:     item.ProjectId,
+			Format:        item.Format,
+			SourceIP:      item.SourceIp,
+			ReceivedAt:    item.ReceivedAt.AsTime().UTC(),
+			Attributes:    json.RawMessage(attributesJSON),
+			S3Key:         internalConsts.SimilarAggregateS3Key,
+		})
 	}
 
 	batchSize := s.cfg.Persistence.LogsCHInsertBatchSize
@@ -115,6 +156,65 @@ func (s *LogEngineService) SaveLogs(ctx context.Context, req *logEngineProto.Sav
 	}
 
 	return nil
+}
+
+func (s *LogEngineService) CheckSimilarLogs(ctx context.Context, req *logEngineProto.CheckSimilarLogsRequest) (*logEngineProto.CheckSimilarLogsResponse, error) {
+	if len(req.Candidates) == 0 {
+		return &logEngineProto.CheckSimilarLogsResponse{Matches: []*logEngineProto.SimilarLogMatch{}}, nil
+	}
+
+	minSimilarity := req.MinSimilarity
+	if minSimilarity <= 0 {
+		minSimilarity = 0.98
+	}
+
+	windowDays := req.WindowDays
+	if windowDays == 0 {
+		windowDays = 30
+	}
+	windowFrom := time.Now().UTC().AddDate(0, 0, -int(windowDays))
+
+	matches := make([]*logEngineProto.SimilarLogMatch, 0, len(req.Candidates))
+	incrementByLogID := make(map[string]uint64)
+	for _, candidate := range req.Candidates {
+		if len(candidate.Embedding) == 0 {
+			matches = append(matches, &logEngineProto.SimilarLogMatch{IsSimilar: false})
+			continue
+		}
+
+		row, err := s.featureRepo.FindMostSimilarInWindow(
+			ctx,
+			candidate.ProjectId,
+			candidate.ApplicationId,
+			pgvector.NewVector(candidate.Embedding),
+			minSimilarity,
+			windowFrom,
+		)
+		if err != nil {
+			return nil, grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
+		}
+
+		if row == nil {
+			matches = append(matches, &logEngineProto.SimilarLogMatch{IsSimilar: false})
+			continue
+		}
+
+		incrementByLogID[row.LogID] = incrementByLogID[row.LogID] + 1
+
+		matches = append(matches, &logEngineProto.SimilarLogMatch{
+			IsSimilar:    true,
+			MatchedLogId: row.LogID,
+			Similarity:   row.Similarity,
+		})
+	}
+
+	for logID, increment := range incrementByLogID {
+		if err := s.featureRepo.IncrementSimilarCounter(ctx, logID, increment); err != nil {
+			return nil, grpc.WithInternal(err).WithSlug(consts.INTERNAL_ERROR_CODE_CREATION_FAILED)
+		}
+	}
+
+	return &logEngineProto.CheckSimilarLogsResponse{Matches: matches}, nil
 }
 
 func buildGroupKey(projectID uint64, applicationID uint64) string {

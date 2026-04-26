@@ -7,13 +7,13 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
-from app.constants import MAX_INGESTION_BYTES, LogFormat
+from app.constants import MAX_INGESTION_BYTES, LogFormat, SIMILAR_REF_LOG_ID_ATTRIBUTE, SIMILAR_SCORE_ATTRIBUTE
 from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError, ProjectQueueFullError, PreparedLogEntry
 from app.kafka_batcher import KafkaPublishBatcher
 from app.kafka_producer import LogsKafkaProducer
 from app.proto import application_pb2, application_pb2_grpc
 from app.proto import ingestion_pb2, ingestion_pb2_grpc
-from app.proto import logengine_pb2
+from app.proto import logengine_pb2, logengine_pb2_grpc
 from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
 from app.utils import compact_json_dumps, to_attribute_string, now_utc, detect_format, parse_json_attributes
 
@@ -24,6 +24,9 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         self._app_channel = grpc.insecure_channel(cfg.application_service)
         self._app_client = application_pb2_grpc.ApplicationServiceStub(
             self._app_channel)
+        self._log_engine_channel = grpc.insecure_channel(cfg.log_engine_service)
+        self._log_engine_client = logengine_pb2_grpc.LogEngineServiceStub(
+            self._log_engine_channel)
         self._logs_producer = LogsKafkaProducer(
             brokers=cfg.kafka_brokers,
             topic=cfg.kafka_topic,
@@ -92,6 +95,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         self._kafka_batcher.close()
         self._logs_producer.close()
         self._features_producer.close()
+        self._log_engine_channel.close()
         self._app_channel.close()
 
     def IngestLogs(self, request: ingestion_pb2.IngestLogRequest, context: grpc.ServicerContext) -> ingestion_pb2.IngestLogResponse:
@@ -160,6 +164,7 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         prepared: list[PreparedLogEntry] = []
         text_indexes: list[int] = []
         text_values: list[str] = []
+        embedding_by_prepared_index: dict[int, list[float]] = {}
 
         for item in job.logs:
             raw_data = item.raw_data
@@ -184,23 +189,71 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
             )
 
         if text_values:
-            predictions = self._extractor.predict_batch(text_values)
             embeddings = self._extractor.encode_embeddings(text_values)
 
-            for idx, prepared_index in enumerate(text_indexes):
-                prediction = predictions[idx]
-                attrs = {
-                    key: to_attribute_string(value)
-                    for key, value in prediction.attributes.items()
-                }
-                attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
-                if prediction.low_confidence_attributes:
-                    attrs["ml_low_confidence_attributes"] = compact_json_dumps(
-                        prediction.low_confidence_attributes,
-                    )
+            similarity_matches: list[logengine_pb2.SimilarLogMatch] = []
+            try:
+                request = logengine_pb2.CheckSimilarLogsRequest(
+                    candidates=[
+                        logengine_pb2.SimilarLogCandidate(
+                            project_id=job.project_id,
+                            application_id=job.application_id,
+                            embedding=embeddings[idx],
+                        )
+                        for idx in range(len(text_indexes))
+                    ],
+                    min_similarity=self._cfg.ingest_similarity_min_score,
+                    window_days=self._cfg.ingest_similarity_window_days,
+                )
+                response = self._log_engine_client.CheckSimilarLogs(
+                    request,
+                    timeout=self._cfg.ingest_similarity_check_timeout_ms / 1000,
+                )
+                similarity_matches = list(response.matches)
+            except grpc.RpcError:
+                similarity_matches = [
+                    logengine_pb2.SimilarLogMatch(is_similar=False)
+                    for _ in text_indexes
+                ]
 
-                prepared[prepared_index].attrs = attrs
-                prepared[prepared_index].embedding = embeddings[idx]
+            prediction_indexes: list[int] = []
+            prediction_texts: list[str] = []
+            for idx, prepared_index in enumerate(text_indexes):
+                if idx >= len(similarity_matches):
+                    prediction_indexes.append(prepared_index)
+                    prediction_texts.append(text_values[idx])
+                    continue
+
+                match = similarity_matches[idx]
+                if match.is_similar:
+                    prepared[prepared_index].attrs = {
+                        SIMILAR_REF_LOG_ID_ATTRIBUTE: match.matched_log_id,
+                        SIMILAR_SCORE_ATTRIBUTE: f"{match.similarity:.6f}",
+                    }
+                    prepared[prepared_index].embedding = []
+                    continue
+
+                prediction_indexes.append(prepared_index)
+                prediction_texts.append(text_values[idx])
+                embedding_by_prepared_index[prepared_index] = embeddings[idx]
+
+            if prediction_texts:
+                predictions = self._extractor.predict_batch(prediction_texts)
+
+                for idx, prepared_index in enumerate(prediction_indexes):
+                    prediction = predictions[idx]
+                    attrs = {
+                        key: to_attribute_string(value)
+                        for key, value in prediction.attributes.items()
+                    }
+                    attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
+                    if prediction.low_confidence_attributes:
+                        attrs["ml_low_confidence_attributes"] = compact_json_dumps(
+                            prediction.low_confidence_attributes,
+                        )
+
+                    prepared[prepared_index].attrs = attrs
+                    prepared[prepared_index].embedding = embedding_by_prepared_index.get(prepared_index, [])
 
         for entry in prepared:
             raw_data = entry.raw_data
@@ -236,7 +289,13 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                 )
             )
 
-        self._kafka_batcher.enqueue(logs, features)
+        filtered_features: list[logengine_pb2.LogFeatureItem] = []
+        for feature in features:
+            if SIMILAR_REF_LOG_ID_ATTRIBUTE in feature.attributes:
+                continue
+            filtered_features.append(feature)
+
+        self._kafka_batcher.enqueue(logs, filtered_features)
 
 
 def serve(cfg: AppConfig) -> None:

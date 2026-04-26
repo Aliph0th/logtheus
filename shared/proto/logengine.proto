@@ -51,6 +51,9 @@ service LogEngineService {
    // Save logs to the storages
   rpc SaveLogs(SaveLogsRequest) returns (SaveLogsResponse);
 
+  // Check embedding similarity in recent window and increment similar counters for matched logs.
+  rpc CheckSimilarLogs(CheckSimilarLogsRequest) returns (CheckSimilarLogsResponse);
+
   // Time-series volume of logs for dashboard charts.
   rpc GetVolumeSeries(GetVolumeSeriesRequest) returns (GetVolumeSeriesResponse);
 
@@ -215,4 +218,26 @@ message SaveLogsRequest {
 message SaveLogsResponse {
   bool   ok          = 1;
   uint32 saved_count = 2;
+}
+
+message SimilarLogCandidate {
+  uint64 project_id = 1;
+  uint64 application_id = 2;
+  repeated float embedding = 3;
+}
+
+message SimilarLogMatch {
+  bool is_similar = 1;
+  string matched_log_id = 2;
+  float similarity = 3;
+}
+
+message CheckSimilarLogsRequest {
+  repeated SimilarLogCandidate candidates = 1;
+  float min_similarity = 2;
+  uint32 window_days = 3;
+}
+
+message CheckSimilarLogsResponse {
+  repeated SimilarLogMatch matches = 1;
 }
