@@ -414,6 +414,72 @@ var LogClusteringResultValidators = []gin.HandlerFunc{
 	).Validate(),
 }
 
+var LogClusteringJobsValidators = []gin.HandlerFunc{
+	gv.NewQuery("project_id", func(_, _, _ string) string {
+		return "project_id must be a positive integer"
+	}).Chain().Not().Empty(&vgo.IsEmptyOpts{IgnoreWhitespace: true}).Bail().Numeric(&vgo.IsNumericOpts{NoSymbols: true}).Bail().CustomValidator(
+		func(_ *http.Request, _, sanitizedValue string) bool {
+			raw := strings.TrimSpace(sanitizedValue)
+			if raw == "" {
+				return false
+			}
+			value := 0
+			for _, ch := range raw {
+				value = value*10 + int(ch-'0')
+				if value > 0 {
+					return true
+				}
+			}
+			return false
+		},
+	).Validate(),
+
+	gv.NewQuery("application_id", func(_, _, _ string) string {
+		return "application_id must be a positive integer"
+	}).Chain().Optional().Numeric(&vgo.IsNumericOpts{NoSymbols: true}).Bail().CustomValidator(
+		func(_ *http.Request, _, sanitizedValue string) bool {
+			raw := strings.TrimSpace(sanitizedValue)
+			if raw == "" {
+				return true
+			}
+			value, err := strconv.ParseUint(raw, 10, 64)
+			if err != nil {
+				return false
+			}
+			return value > 0
+		},
+	).Validate(),
+
+	gv.NewQuery("offset", func(_, _, _ string) string {
+		return "offset must be a non-negative integer"
+	}).Chain().Optional().CustomValidator(
+		func(_ *http.Request, _, sanitizedValue string) bool {
+			value := strings.TrimSpace(sanitizedValue)
+			if value == "" {
+				return true
+			}
+			_, err := strconv.ParseUint(value, 10, 32)
+			return err == nil
+		},
+	).Validate(),
+
+	gv.NewQuery("limit", func(_, _, _ string) string {
+		return "limit must be a positive integer <= 1000"
+	}).Chain().Optional().CustomValidator(
+		func(_ *http.Request, _, sanitizedValue string) bool {
+			value := strings.TrimSpace(sanitizedValue)
+			if value == "" {
+				return true
+			}
+			parsed, err := strconv.ParseUint(value, 10, 32)
+			if err != nil {
+				return false
+			}
+			return parsed > 0 && parsed <= 1000
+		},
+	).Validate(),
+}
+
 func validateLogMetricsRangeQuery(ctx *gin.Context) {
 	fromRaw := strings.TrimSpace(ctx.Query("from"))
 	toRaw := strings.TrimSpace(ctx.Query("to"))

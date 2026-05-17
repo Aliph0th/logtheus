@@ -52,6 +52,13 @@ type LogClusteringResultQuery struct {
 	Limit  *uint32 `form:"limit"`
 }
 
+type LogClusteringJobsQuery struct {
+	ProjectID     uint64  `form:"project_id" binding:"required"`
+	ApplicationID uint64  `form:"application_id"`
+	Offset        *uint32 `form:"offset"`
+	Limit         *uint32 `form:"limit"`
+}
+
 func (q *LogMetricsQuery) ToProtoFilter() (*logEngineProto.LogAggregationFilter, error) {
 	from, err := time.Parse(time.RFC3339, strings.TrimSpace(q.From))
 	if err != nil {
@@ -130,6 +137,27 @@ func (q *LogClusteringResultQuery) ToProtoRequest(jobID string) *logEngineProto.
 		Offset: offset,
 		Limit:  limit,
 	}
+}
+
+func (q *LogClusteringJobsQuery) ToProtoRequest() *logEngineProto.GetClusteringJobsRequest {
+	offset := uint32(0)
+	if q.Offset != nil {
+		offset = *q.Offset
+	}
+	limit := uint32(0)
+	if q.Limit != nil {
+		limit = *q.Limit
+	}
+
+	request := &logEngineProto.GetClusteringJobsRequest{
+		ProjectId: q.ProjectID,
+		Offset:    offset,
+		Limit:     limit,
+	}
+	if q.ApplicationID > 0 {
+		request.ApplicationId = &q.ApplicationID
+	}
+	return request
 }
 
 func (r *LogClusteringStartRequest) ToProtoRequest() (*logEngineProto.StartClusteringJobRequest, error) {

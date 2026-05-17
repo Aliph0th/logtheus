@@ -33,6 +33,9 @@ service ProjectService {
   // Get member role in a project
   rpc GetMemberRole (GetMemberRoleRequest) returns (GetMemberRoleResponse);
 
+  // Get project members with roles
+  rpc GetProjectMembers (GetProjectMembersRequest) returns (GetProjectMembersResponse);
+
   // Invite a user to a project.
   rpc CreateInvite (InviteUserRequest) returns (InviteUserResponse);
 }
@@ -73,6 +76,27 @@ message GetMemberRoleRequest {
 
 message GetMemberRoleResponse {
   Role role = 1;
+}
+
+message GetProjectMembersRequest {
+  uint64 project_id = 1;
+}
+
+message ProjectMemberUser {
+  uint64 id       = 1;
+  string email    = 2;
+  string username = 3;
+}
+
+message ProjectMemberItem {
+  uint64                    user_id   = 1;
+  Role                      role      = 2;
+  google.protobuf.Timestamp joined_at = 3;
+  ProjectMemberUser         user      = 4;
+}
+
+message GetProjectMembersResponse {
+  repeated ProjectMemberItem members = 1;
 }
 
 message InviteUserRequest {

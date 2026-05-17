@@ -161,3 +161,7 @@ func (s *UserService) GetUserByIdentifier(req *userProto.GetUserRequest) (*model
 	}
 	return nil, grpc.WithInvalidArgument("Invalid identifier type").WithSlug(consts.ERROR_CODE_UNKNOWN)
 }
+
+func (s *UserService) GetUsersByIDs(ids []uint64) ([]*models.User, error) {
+	return s.repo.GetByIDs(ids)
+}

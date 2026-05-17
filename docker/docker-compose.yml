@@ -28,6 +28,20 @@ services:
          - 5433:5432
       networks:
          - logtheus_net
+   pg_application:
+      image: postgres:17
+      restart: unless-stopped
+      container_name: logtheus_application_db
+      environment:
+         - POSTGRES_USER=${POSTGRES_APPLICATION_USER}
+         - POSTGRES_PASSWORD=${POSTGRES_APPLICATION_PASSWORD}
+         - POSTGRES_DB=${POSTGRES_APPLICATION_DB}
+      volumes:
+         - logtheus_application_db:/var/lib/postgresql/data
+      ports:
+         - 5435:5432
+      networks:
+         - logtheus_net
    pg_logengine:
       image: pgvector/pgvector:pg17
       restart: unless-stopped
@@ -110,6 +124,7 @@ services:
 volumes:
    logtheus_user_db:
    logtheus_project_db:
+   logtheus_application_db:
    logtheus_logengine_features_db:
    logtheus_user_redis:
    logtheus_logengine_clickhouse:

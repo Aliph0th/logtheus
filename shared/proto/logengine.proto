@@ -69,6 +69,9 @@ service LogEngineService {
   // Get clustering job status and progress.
   rpc GetClusteringJobStatus(GetClusteringJobStatusRequest) returns (GetClusteringJobStatusResponse);
 
+  // Get clustering jobs for a project.
+  rpc GetClusteringJobs(GetClusteringJobsRequest) returns (GetClusteringJobsResponse);
+
   // Get paged clustering job result.
   rpc GetClusteringJobResult(GetClusteringJobResultRequest) returns (GetClusteringJobResultResponse);
 
@@ -186,6 +189,37 @@ message GetClusteringJobStatusResponse {
   google.protobuf.Timestamp started_at = 9;
   google.protobuf.Timestamp finished_at = 10;
   google.protobuf.Timestamp expires_at = 11;
+}
+
+message ClusteringJobItem {
+  string job_id = 1;
+  ClusteringJobStatus status = 2;
+  double progress_percent = 3;
+  uint32 total_points = 4;
+  uint32 cluster_count = 5;
+  uint32 noise_count = 6;
+  string error_message = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+  google.protobuf.Timestamp expires_at = 11;
+  uint64 project_id = 12;
+  optional uint64 application_id = 13;
+  string cluster_by = 14;
+  google.protobuf.Timestamp from = 15;
+  google.protobuf.Timestamp to = 16;
+}
+
+message GetClusteringJobsRequest {
+  uint64 project_id = 1;
+  optional uint64 application_id = 2;
+  uint32 offset = 3;
+  uint32 limit = 4;
+}
+
+message GetClusteringJobsResponse {
+  repeated ClusteringJobItem jobs = 1;
+  uint32 total = 2;
 }
 
 message GetClusteringJobResultRequest {

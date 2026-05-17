@@ -135,6 +135,72 @@ func (s *ClusteringService) GetClusteringJobStatus(ctx context.Context, req *log
 	}, nil
 }
 
+func (s *ClusteringService) GetClusteringJobs(ctx context.Context, req *logEngineProto.GetClusteringJobsRequest) (*logEngineProto.GetClusteringJobsResponse, error) {
+	projectID := req.GetProjectId()
+	if projectID == 0 {
+		return nil, grpc.WithInvalidArgument("project_id is required")
+	}
+	if accessErr := utils.EnsureProjectReadAccess(ctx, projectID, s.projectClient); accessErr != nil {
+		return nil, accessErr
+	}
+
+	var applicationID *uint64
+	if req.ApplicationId != nil {
+		value := req.GetApplicationId()
+		if value > 0 {
+			applicationID = &value
+		}
+	}
+
+	limit := req.GetLimit()
+	if limit == 0 {
+		limit = consts.DEFAULT_CLUSTERING_RESULT_PAGE_SIZE
+	}
+	if limit > consts.MAX_CLUSTERING_RESULT_PAGE_SIZE {
+		limit = consts.MAX_CLUSTERING_RESULT_PAGE_SIZE
+	}
+
+	jobs, total, repoErr := s.clusteringRepo.ListJobs(ctx, projectID, applicationID, req.GetOffset(), limit)
+	if repoErr != nil {
+		return nil, grpc.WithInternal(repoErr).WithSlug(sharedConsts.INTERNAL_ERROR_CODE_CLUSTERING_FAILED)
+	}
+
+	items := make([]*logEngineProto.ClusteringJobItem, 0, len(jobs))
+	for _, job := range jobs {
+		item := &logEngineProto.ClusteringJobItem{
+			JobId:           job.JobID.String(),
+			Status:          utils.ClusteringStatusToProto(job.Status, job.ExpiresAt),
+			ProgressPercent: job.ProgressPercent,
+			TotalPoints:     job.TotalPoints,
+			ClusterCount:    job.ClusterCount,
+			NoiseCount:      job.NoiseCount,
+			ErrorMessage:    job.ErrorMessage,
+			CreatedAt:       timestamppb.New(job.CreatedAt),
+			ExpiresAt:       timestamppb.New(job.ExpiresAt),
+			ProjectId:       job.ProjectID,
+			ClusterBy:       job.ClusterBy,
+			From:            timestamppb.New(job.FromTime),
+			To:              timestamppb.New(job.ToTime),
+		}
+		if job.ApplicationID != nil {
+			appID := *job.ApplicationID
+			item.ApplicationId = &appID
+		}
+		if job.StartedAt != nil {
+			item.StartedAt = timestamppb.New(job.StartedAt.UTC())
+		}
+		if job.FinishedAt != nil {
+			item.FinishedAt = timestamppb.New(job.FinishedAt.UTC())
+		}
+		items = append(items, item)
+	}
+
+	return &logEngineProto.GetClusteringJobsResponse{
+		Jobs:  items,
+		Total: total,
+	}, nil
+}
+
 func (s *ClusteringService) GetClusteringJobResult(ctx context.Context, req *logEngineProto.GetClusteringJobResultRequest) (*logEngineProto.GetClusteringJobResultResponse, error) {
 	jobIDStr := strings.TrimSpace(req.GetJobId())
 	jobID, _ := uuid.Parse(jobIDStr)

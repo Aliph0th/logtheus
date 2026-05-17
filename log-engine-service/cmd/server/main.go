@@ -58,6 +58,7 @@ func main() {
 			slog.Error("Failed to migrate ClickHouse", sl.Error(err))
 			os.Exit(1)
 		}
+		featuresDB.DB.Config.DisableForeignKeyConstraintWhenMigrating = true
 		if err := featuresDB.Migrate(
 			&models.LogFeature{},
 			&models.ClusteringJob{},
@@ -66,6 +67,19 @@ func main() {
 		); err != nil {
 			slog.Error("Failed to migrate Postgres", sl.Error(err))
 			os.Exit(1)
+		}
+		featuresDB.DB.Config.DisableForeignKeyConstraintWhenMigrating = false
+		if !featuresDB.DB.Migrator().HasConstraint(&models.ClusteringJob{}, "Assignments") {
+			if err := featuresDB.DB.Migrator().CreateConstraint(&models.ClusteringJob{}, "Assignments"); err != nil {
+				slog.Error("Failed to create clustering assignment constraint", sl.Error(err))
+				os.Exit(1)
+			}
+		}
+		if !featuresDB.DB.Migrator().HasConstraint(&models.ClusteringJob{}, "Summaries") {
+			if err := featuresDB.DB.Migrator().CreateConstraint(&models.ClusteringJob{}, "Summaries"); err != nil {
+				slog.Error("Failed to create clustering summary constraint", sl.Error(err))
+				os.Exit(1)
+			}
 		}
 	}
 

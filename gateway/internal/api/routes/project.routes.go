@@ -38,6 +38,7 @@ func RegisterProjectRoutes(api *gin.RouterGroup, container *dig.Container) {
 
 		projects.GET("/my", controller.GetMyProjects)
 		projects.GET("/:id", validators.DatabaseID("id"), controller.GetProjectByID)
+		projects.GET("/:id/members", validators.DatabaseID("id"), controller.GetProjectMembers)
 
 		RegisterInvitesRoutes(projects, container)
 	}

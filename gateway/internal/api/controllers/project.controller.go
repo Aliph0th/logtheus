@@ -5,6 +5,7 @@ import (
 	excepts "logtheus/gateway/internal/api/exceptions"
 	"logtheus/gateway/internal/utils"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
+	sharedUtils "logtheus/shared/pkg/utils"
 	"net/http"
 	"strconv"
 
@@ -63,6 +64,38 @@ func (c *ProjectController) GetProjectByID(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"project": utils.FromGrpcToDTO(project, &dto.ProjectDTO{})})
+}
+
+func (c *ProjectController) GetProjectMembers(ctx *gin.Context) {
+	id, _ := strconv.ParseUint(ctx.Param("id"), 10, 64)
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, err := c.projectClient.GetProjectMembers(grpcCtx, &projectProto.GetProjectMembersRequest{ProjectId: id})
+	if err != nil {
+		excepts.RespondError(ctx, err)
+		return
+	}
+
+	members := make([]*dto.ProjectMemberDTO, len(response.Members))
+	for i, member := range response.Members {
+		item := &dto.ProjectMemberDTO{
+			UserId: member.UserId,
+			Role:   sharedUtils.GRPCRoleToHttpRole(member.Role),
+		}
+		if member.JoinedAt != nil {
+			joinedAt := member.JoinedAt.AsTime().Unix()
+			item.JoinedAt = &joinedAt
+		}
+		if member.User != nil {
+			item.User = &dto.ProjectMemberUserDTO{
+				Id:       member.User.Id,
+				Email:    member.User.Email,
+				Username: member.User.Username,
+			}
+		}
+		members[i] = item
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"members": members})
 }
 
 func (c *ProjectController) UpdateProject(ctx *gin.Context) {

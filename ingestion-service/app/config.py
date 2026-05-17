@@ -84,5 +84,5 @@ def load_config() -> AppConfig:
         ingest_similarity_window_days=int(
             os.getenv("INGEST_SIMILARITY_WINDOW_DAYS", "30")),
         ingest_similarity_check_timeout_ms=int(
-            os.getenv("INGEST_SIMILARITY_CHECK_TIMEOUT_MS", "20")),
+            os.getenv("INGEST_SIMILARITY_CHECK_TIMEOUT_MS", "2000")),
     )

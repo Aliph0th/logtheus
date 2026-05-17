@@ -29,6 +29,8 @@ type ClusteringJob struct {
 	UpdatedAt       time.Time                  `gorm:"not null;u"`
 	StartedAt       *time.Time
 	FinishedAt      *time.Time
+	Assignments     []ClusteringAssignment     `gorm:"foreignKey:JobID;references:JobID;constraint:OnDelete:CASCADE"`
+	Summaries       []ClusteringClusterSummary `gorm:"foreignKey:JobID;references:JobID;constraint:OnDelete:CASCADE"`
 }
 
 func (ClusteringJob) TableName() string {

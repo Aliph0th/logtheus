@@ -20,6 +20,25 @@ func NewClusteringJobRepository(db *storages.Database) *ClusteringJobRepository 
 	return &ClusteringJobRepository{db: db.DB}
 }
 
+func dedupeAssignmentsByLogID(assignments []*models.ClusteringAssignment) []*models.ClusteringAssignment {
+	if len(assignments) <= 1 {
+		return assignments
+	}
+
+	unique := make([]*models.ClusteringAssignment, 0, len(assignments))
+	seen := make(map[string]int, len(assignments))
+	for _, assignment := range assignments {
+		if index, exists := seen[assignment.LogID]; exists {
+			unique[index] = assignment
+			continue
+		}
+		seen[assignment.LogID] = len(unique)
+		unique = append(unique, assignment)
+	}
+
+	return unique
+}
+
 func (r *ClusteringJobRepository) Create(ctx context.Context, job *models.ClusteringJob) error {
 	return r.db.WithContext(ctx).Create(job).Error
 }
@@ -50,6 +69,32 @@ func (r *ClusteringJobRepository) GetByID(ctx context.Context, jobID uuid.UUID) 
 		return nil, err
 	}
 	return &job, nil
+}
+
+func (r *ClusteringJobRepository) ListJobs(
+	ctx context.Context,
+	projectID uint64,
+	applicationID *uint64,
+	offset uint32,
+	limit uint32,
+) ([]*models.ClusteringJob, uint32, error) {
+	base := r.db.WithContext(ctx).Model(&models.ClusteringJob{}).Where("project_id = ?", projectID)
+	if applicationID != nil {
+		base = base.Where("application_id = ?", *applicationID)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	rows := make([]*models.ClusteringJob, 0)
+	query := base.Order("created_at DESC").Offset(int(offset)).Limit(int(limit))
+	if err := query.Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return rows, uint32(total), nil
 }
 
 func (r *ClusteringJobRepository) MarkRunning(ctx context.Context, jobID uuid.UUID, startedAt time.Time) (bool, error) {
@@ -115,6 +160,8 @@ func (r *ClusteringJobRepository) SaveSucceededResult(
 	noiseCount uint32,
 	now time.Time,
 ) error {
+	assignments = dedupeAssignmentsByLogID(assignments)
+
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("job_id = ?", jobID).Delete(&models.ClusteringAssignment{}).Error; err != nil {
 			return err

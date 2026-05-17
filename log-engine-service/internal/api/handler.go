@@ -76,6 +76,10 @@ func (h *LogEngineHandler) GetClusteringJobStatus(ctx context.Context, req *logE
 	return h.clusteringService.GetClusteringJobStatus(ctx, req)
 }
 
+func (h *LogEngineHandler) GetClusteringJobs(ctx context.Context, req *logEngineProto.GetClusteringJobsRequest) (*logEngineProto.GetClusteringJobsResponse, error) {
+	return h.clusteringService.GetClusteringJobs(ctx, req)
+}
+
 func (h *LogEngineHandler) GetClusteringJobResult(ctx context.Context, req *logEngineProto.GetClusteringJobResultRequest) (*logEngineProto.GetClusteringJobResultResponse, error) {
 	return h.clusteringService.GetClusteringJobResult(ctx, req)
 }

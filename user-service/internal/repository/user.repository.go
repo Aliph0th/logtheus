@@ -47,3 +47,15 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 func (r *UserRepository) VerifyEmail(userID uint64) error {
 	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("is_email_verified", true).Error
 }
+
+func (r *UserRepository) GetByIDs(ids []uint64) ([]*models.User, error) {
+	if len(ids) == 0 {
+		return []*models.User{}, nil
+	}
+
+	var users []*models.User
+	if err := r.db.Where("id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}

@@ -114,7 +114,7 @@ func RunDBSCANCosine(vectors [][]float32, eps float64, minPoints int) []int32 {
 		labels[i] = math.MinInt32
 	}
 
-	clusterID := int32(0)
+	clusterID := int32(1)
 	for i := 0; i < n; i++ {
 		if labels[i] != math.MinInt32 {
 			continue
@@ -160,7 +160,7 @@ func RunDBSCANCosine(vectors [][]float32, eps float64, minPoints int) []int32 {
 
 func ClusterByExactValue(values []string) []int32 {
 	labels := make([]int32, len(values))
-	nextClusterID := int32(0)
+	nextClusterID := int32(1)
 	clusterByValue := make(map[string]int32)
 
 	for idx, value := range values {

@@ -101,7 +101,11 @@ func (c *LogController) GetAggregationByField(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"items": response.Items})
+	items := response.Items
+	if items == nil {
+		items = []*logEngineProto.AggregationItem{}
+	}
+	ctx.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 func (c *LogController) GetLatencyStats(ctx *gin.Context) {
@@ -118,8 +122,16 @@ func (c *LogController) GetLatencyStats(ctx *gin.Context) {
 		excepts.RespondError(ctx, grpcErr)
 		return
 	}
+	var statsPayload gin.H
+	if stats := response.GetStats(); stats != nil {
+		statsPayload = gin.H{
+			"p50": utils.NormalizeFloat(stats.GetP50()),
+			"p95": utils.NormalizeFloat(stats.GetP95()),
+			"p99": utils.NormalizeFloat(stats.GetP99()),
+		}
+	}
 
-	ctx.JSON(http.StatusOK, gin.H{"stats": response.Stats})
+	ctx.JSON(http.StatusOK, gin.H{"stats": statsPayload})
 }
 
 func (c *LogController) StartClusteringJob(ctx *gin.Context) {
@@ -201,6 +213,65 @@ func (c *LogController) GetClusteringJobResult(ctx *gin.Context) {
 		"total_items": response.TotalItems,
 		"assignments": response.Assignments,
 		"clusters":    response.Clusters,
+	})
+}
+
+func (c *LogController) GetClusteringJobs(ctx *gin.Context) {
+	data := utils.MustDTO[*dto.LogClusteringJobsQuery](ctx)
+	grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+	response, grpcErr := c.logEngineClient.GetClusteringJobs(grpcCtx, data.ToProtoRequest())
+	if grpcErr != nil {
+		excepts.RespondError(ctx, grpcErr)
+		return
+	}
+
+	jobs := make([]gin.H, 0, len(response.Jobs))
+	for _, job := range response.Jobs {
+		payload := gin.H{
+			"job_id":           job.JobId,
+			"status":           job.Status.String(),
+			"progress_percent": job.ProgressPercent,
+			"total_points":     job.TotalPoints,
+			"cluster_count":    job.ClusterCount,
+			"noise_count":      job.NoiseCount,
+			"error_message":    job.ErrorMessage,
+			"created_at":       "",
+			"started_at":       nil,
+			"finished_at":      nil,
+			"expires_at":       "",
+			"project_id":       job.ProjectId,
+			"application_id":   nil,
+			"cluster_by":       job.ClusterBy,
+			"from":             "",
+			"to":               "",
+		}
+		if job.CreatedAt != nil {
+			payload["created_at"] = job.CreatedAt.AsTime().UTC().Format(time.RFC3339)
+		}
+		if job.StartedAt != nil {
+			payload["started_at"] = job.StartedAt.AsTime().UTC().Format(time.RFC3339)
+		}
+		if job.FinishedAt != nil {
+			payload["finished_at"] = job.FinishedAt.AsTime().UTC().Format(time.RFC3339)
+		}
+		if job.ExpiresAt != nil {
+			payload["expires_at"] = job.ExpiresAt.AsTime().UTC().Format(time.RFC3339)
+		}
+		if job.ApplicationId != nil {
+			payload["application_id"] = job.GetApplicationId()
+		}
+		if job.From != nil {
+			payload["from"] = job.From.AsTime().UTC().Format(time.RFC3339)
+		}
+		if job.To != nil {
+			payload["to"] = job.To.AsTime().UTC().Format(time.RFC3339)
+		}
+		jobs = append(jobs, payload)
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"jobs":  jobs,
+		"total": response.Total,
 	})
 }
 

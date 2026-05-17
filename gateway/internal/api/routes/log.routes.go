@@ -66,6 +66,13 @@ func RegisterLogRoutes(api *gin.RouterGroup, container *dig.Container) {
 			controller.StartClusteringJob,
 		)...)
 
+		clustering.GET("/jobs", append(
+			validators.LogClusteringJobsValidators,
+			middleware.ValidationMiddleware,
+			middleware.BindDTO[*dto.LogClusteringJobsQuery](),
+			controller.GetClusteringJobs,
+		)...)
+
 		clustering.GET("/jobs/:job_id", append(
 			validators.LogClusteringJobIDValidators,
 			middleware.ValidationMiddleware,

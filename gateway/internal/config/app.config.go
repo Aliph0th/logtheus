@@ -3,7 +3,8 @@ package config
 type AppConfig struct {
 	Env    string `mapstructure:"ENV"`
 	Server struct {
-		Port int `mapstructure:"PORT"`
+		Port        int    `mapstructure:"PORT"`
+		AllowOrigin string `mapstructure:"ALLOWED_ORIGIN"`
 	} `mapstructure:",squash"`
 
 	Services struct {
