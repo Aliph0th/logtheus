@@ -28,6 +28,35 @@ services:
          - 5433:5432
       networks:
          - logtheus_net
+   pg_application:
+      image: postgres:17
+      restart: unless-stopped
+      container_name: logtheus_application_db
+      environment:
+         - POSTGRES_USER=${POSTGRES_APPLICATION_USER}
+         - POSTGRES_PASSWORD=${POSTGRES_APPLICATION_PASSWORD}
+         - POSTGRES_DB=${POSTGRES_APPLICATION_DB}
+      volumes:
+         - logtheus_application_db:/var/lib/postgresql/data
+      ports:
+         - 5435:5432
+      networks:
+         - logtheus_net
+   pg_logengine:
+      image: pgvector/pgvector:pg17
+      restart: unless-stopped
+      container_name: logtheus_logengine_db
+      environment:
+         - POSTGRES_USER=${POSTGRES_LOGENGINE_USER}
+         - POSTGRES_PASSWORD=${POSTGRES_LOGENGINE_PASSWORD}
+         - POSTGRES_DB=${POSTGRES_LOGENGINE_DB}
+      volumes:
+         - logtheus_logengine_features_db:/var/lib/postgresql/data
+         - ./init/pg_logengine_features_init.sql:/docker-entrypoint-initdb.d/01_init_pgvector.sql:ro
+      ports:
+         - 5434:5432
+      networks:
+         - logtheus_net
    redis:
       image: redis:7.2.7-alpine
       container_name: logtheus_user_redis
@@ -95,6 +124,8 @@ services:
 volumes:
    logtheus_user_db:
    logtheus_project_db:
+   logtheus_application_db:
+   logtheus_logengine_features_db:
    logtheus_user_redis:
    logtheus_logengine_clickhouse:
    logtheus_kafka_data:

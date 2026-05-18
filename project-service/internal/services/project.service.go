@@ -9,22 +9,27 @@ import (
 	"logtheus/shared/pkg/consts"
 	"logtheus/shared/pkg/grpc"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
+	userProto "logtheus/shared/pkg/pb/v1/user"
 	"logtheus/shared/pkg/utils"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ProjectService struct {
 	projectRepo *repository.ProjectRepository
 	memberRepo  *repository.MemberRepository
+	userClient  userProto.UserServiceClient
 	cfg         *config.AppConfig
 }
 
 func NewProjectService(
 	projectRepo *repository.ProjectRepository,
 	memberRepo *repository.MemberRepository,
+	userClient userProto.UserServiceClient,
 	cfg *config.AppConfig,
 ) *ProjectService {
-	return &ProjectService{projectRepo, memberRepo, cfg}
+	return &ProjectService{projectRepo, memberRepo, userClient, cfg}
 }
 
 func (s *ProjectService) CreateProject(ctx context.Context, dto *projectProto.CreateProjectRequest) (*models.Project, uint8, error) {
@@ -94,6 +99,56 @@ func (s *ProjectService) IsMember(userID, projectID uint64) bool {
 
 func (s *ProjectService) CountMembers(projectID uint64) (uint8, error) {
 	return s.memberRepo.CountProjectMembers(projectID)
+}
+
+func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID uint64) ([]*projectProto.ProjectMemberItem, error) {
+	auth := utils.MustUserData(ctx)
+	if !s.IsMember(auth.UserID, projectID) {
+		return nil, grpc.WithPermissionDenied("You are not a member of this project")
+	}
+
+	members, err := s.memberRepo.ListProjectMembers(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]uint64, 0, len(members))
+	for _, member := range members {
+		userIDs = append(userIDs, member.UserID)
+	}
+
+	usersByID := make(map[uint64]*userProto.User, len(userIDs))
+	if len(userIDs) > 0 {
+		grpcCtx := utils.GetGRPCContextWithAuth(ctx)
+		usersResponse, err := s.userClient.GetUsersByIds(grpcCtx, &userProto.GetUsersByIdsRequest{UserIds: userIDs})
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range usersResponse.Users {
+			usersByID[user.Id] = user
+		}
+	}
+
+	items := make([]*projectProto.ProjectMemberItem, len(members))
+	for i, member := range members {
+		item := &projectProto.ProjectMemberItem{
+			UserId: member.UserID,
+			Role:   utils.HttpRoleToGRPCRole(member.Role),
+		}
+		if member.JoinedAt != nil {
+			item.JoinedAt = timestamppb.New(*member.JoinedAt)
+		}
+		if user, ok := usersByID[member.UserID]; ok {
+			item.User = &projectProto.ProjectMemberUser{
+				Id:       user.Id,
+				Email:    user.Email,
+				Username: user.Username,
+			}
+		}
+		items[i] = item
+	}
+
+	return items, nil
 }
 
 func (s *ProjectService) UpdateProject(ctx context.Context, dto *projectProto.UpdateProjectRequest) (*models.Project, error) {

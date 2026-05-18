@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import torch
 from huggingface_hub import snapshot_download
 from transformers import AutoModelForTokenClassification, AutoTokenizer
+from sentence_transformers import SentenceTransformer
 
 
 @dataclass
@@ -24,9 +25,18 @@ class ModelPrediction:
 
 
 class LogAttributeExtractor:
-    def __init__(self, model_dir: str, confidence_threshold: float = 0.75) -> None:
+    def __init__(
+        self,
+        model_dir: str,
+        confidence_threshold: float,
+        embedding_model_dir: str,
+        ner_batch_size: int = 16,
+        embedding_batch_size: int = 32,
+    ) -> None:
         self.model_dir = Path(model_dir)
         self.confidence_threshold = confidence_threshold
+        self.ner_batch_size = max(1, ner_batch_size)
+        self.embedding_batch_size = max(1, embedding_batch_size)
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_dir,
@@ -40,22 +50,51 @@ class LogAttributeExtractor:
         self.id2label = self.model.config.id2label
         self.model_version = _read_model_version(self.model_dir)
 
-    def predict(self, text: str) -> ModelPrediction:
-        encoded = self.tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256,
-            return_offsets_mapping=True,
-        )
-        offsets = encoded.pop("offset_mapping")[0].tolist()
+        self.embedding_model = SentenceTransformer(embedding_model_dir, local_files_only=True)
 
-        with torch.no_grad():
-            output = self.model(**encoded)
-        logits = output.logits[0]
-        probs = torch.softmax(logits, dim=-1)
-        pred_ids = torch.argmax(probs, dim=-1).tolist()
-        pred_scores = torch.max(probs, dim=-1).values.tolist()
+    def predict_batch(self, texts: list[str]) -> list[ModelPrediction]:
+        if not texts:
+            return []
+
+        predictions: list[ModelPrediction] = []
+        for start in range(0, len(texts), self.ner_batch_size):
+            chunk = texts[start:start + self.ner_batch_size]
+            encoded = self.tokenizer(
+                chunk,
+                return_tensors="pt",
+                truncation=True,
+                max_length=512,
+                padding=True,
+                return_offsets_mapping=True,
+            )
+
+            offsets_batch = encoded.pop("offset_mapping").tolist()
+            with torch.no_grad():
+                output = self.model(**encoded)
+
+            probs = torch.softmax(output.logits, dim=-1)
+            pred_ids_batch = torch.argmax(probs, dim=-1).tolist()
+            pred_scores_batch = torch.max(probs, dim=-1).values.tolist()
+
+            for idx, text in enumerate(chunk):
+                predictions.append(
+                    self._build_prediction(
+                        text=text,
+                        pred_ids=pred_ids_batch[idx],
+                        pred_scores=pred_scores_batch[idx],
+                        offsets=offsets_batch[idx],
+                    )
+                )
+
+        return predictions
+
+    def _build_prediction(
+        self,
+        text: str,
+        pred_ids: list[int],
+        pred_scores: list[float],
+        offsets: list[list[int]],
+    ) -> ModelPrediction:
 
         grouped_values: dict[str, list[str]] = defaultdict(list)
         grouped_scores: dict[str, list[float]] = defaultdict(list)
@@ -78,7 +117,8 @@ class LogAttributeExtractor:
             if value:
                 grouped_values[current_label].append(value)
                 grouped_scores[current_label].append(
-                    float(sum(current_scores) / len(current_scores)) if current_scores else 0.0
+                    float(sum(current_scores) / len(current_scores)
+                          ) if current_scores else 0.0
                 )
 
             current_label = None
@@ -95,7 +135,12 @@ class LogAttributeExtractor:
                 flush_current()
                 continue
 
-            prefix, entity = label.split("-", maxsplit=1)
+            parts = label.split("-", maxsplit=1)
+            if len(parts) == 2:
+                prefix, entity = parts
+            else:
+                prefix = "B"
+                entity = label
 
             if prefix == "B" or (current_label is not None and current_label != entity):
                 flush_current()
@@ -123,11 +168,13 @@ class LogAttributeExtractor:
 
         for label, values in grouped_values.items():
             label_scores = grouped_scores[label]
-            mean_score = float(sum(label_scores) / len(label_scores)) if label_scores else 0.0
+            mean_score = float(sum(label_scores) /
+                               len(label_scores)) if label_scores else 0.0
             all_scores.extend(label_scores)
 
             value: Any = values[0] if len(values) == 1 else values
-            confidence_value: Any = label_scores[0] if len(label_scores) == 1 else label_scores
+            confidence_value: Any = label_scores[0] if len(
+                label_scores) == 1 else label_scores
             attribute_confidence[label] = confidence_value
 
             if mean_score >= self.confidence_threshold:
@@ -135,7 +182,8 @@ class LogAttributeExtractor:
             else:
                 low_confidence_attributes[label] = value
 
-        overall_confidence = float(sum(all_scores) / len(all_scores)) if all_scores else 0.0
+        overall_confidence = float(
+            sum(all_scores) / len(all_scores)) if all_scores else 0.0
 
         return ModelPrediction(
             attributes=attributes,
@@ -145,6 +193,19 @@ class LogAttributeExtractor:
             confidence=overall_confidence,
             model_version=self.model_version,
         )
+
+    def encode_embeddings(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        embeddings = self.embedding_model.encode(
+            texts,
+            convert_to_tensor=True,
+            batch_size=self.embedding_batch_size,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return embeddings.tolist()
 
 
 def ensure_model_downloaded(
@@ -172,7 +233,8 @@ def ensure_model_downloaded(
     )
 
     if not _is_model_present(local_path):
-        raise RuntimeError("Model download completed, but expected model files are missing")
+        raise RuntimeError(
+            "Model download completed, but expected model files are missing")
 
     return local_path
 
@@ -191,8 +253,10 @@ def _is_model_present(path: Path) -> bool:
         return False
 
     has_config = (path / "config.json").exists()
-    has_tokenizer = (path / "tokenizer_config.json").exists() or (path / "tokenizer.json").exists()
-    has_weights = any(path.glob("*.safetensors")) or (path / "pytorch_model.bin").exists()
+    has_tokenizer = (
+        path / "tokenizer_config.json").exists() or (path / "tokenizer.json").exists()
+    has_weights = any(path.glob("*.safetensors")
+                      ) or (path / "pytorch_model.bin").exists()
     return has_config and has_tokenizer and has_weights
 
 
@@ -204,11 +268,13 @@ def _extract_repo_id(model_source: str) -> str:
     if src.startswith("http://") or src.startswith("https://"):
         parsed = urlparse(src)
         if "huggingface.co" not in parsed.netloc:
-            raise ValueError("LOG_MODEL_HF_SOURCE must point to huggingface.co")
+            raise ValueError(
+                "LOG_MODEL_HF_SOURCE must point to huggingface.co")
 
         parts = [p for p in parsed.path.split("/") if p]
         if len(parts) < 2:
-            raise ValueError("Cannot parse Hugging Face repo id from LOG_MODEL_HF_SOURCE")
+            raise ValueError(
+                "Cannot parse Hugging Face repo id from LOG_MODEL_HF_SOURCE")
         return f"{parts[0]}/{parts[1]}"
 
     return src

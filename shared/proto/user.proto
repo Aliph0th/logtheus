@@ -34,6 +34,9 @@ service UserService {
   // Get user by id or email
   rpc GetUser (GetUserRequest) returns (User);
 
+  // Get users by ids
+  rpc GetUsersByIds (GetUsersByIdsRequest) returns (GetUsersByIdsResponse);
+
   // Issues a new invite token
   rpc IssueInviteToken (google.protobuf.Empty) returns (InviteTokenResponse);
 }
@@ -77,6 +80,14 @@ message GetUserRequest {
     uint64 user_id = 1;
     string email = 2;
   }
+}
+
+message GetUsersByIdsRequest {
+  repeated uint64 user_ids = 1;
+}
+
+message GetUsersByIdsResponse {
+  repeated User users = 1;
 }
 
 message InviteTokenResponse {

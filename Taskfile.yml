@@ -17,8 +17,7 @@ tasks:
             dev:project,
             dev:mail,
             dev:application,
-            # dev:ingestion,
-            dev:ingestion:python,
+            dev:ingestion,
             dev:logengine
          ]
 
@@ -73,16 +72,10 @@ tasks:
          - air -c .air.toml
 
    dev:ingestion:
-      desc: Ingestion Service
-      dir: ./ingestion-service
-      prefix: 'INGESTION_SERVICE'
-      cmds:
-         - air -c .air.toml
-
-   dev:ingestion:python:
       desc: Ingestion Service Python
       dir: ./ingestion-service
       prefix: 'INGESTION_SERVICE_PY'
+      watch: true
       cmds:
          - ./.venv/Scripts/python -m app.server
 

@@ -40,6 +40,17 @@ func (r *MemberRepository) AddMember(member *models.ProjectMember) error {
 	return r.db.Create(member).Error
 }
 
+func (r *MemberRepository) ListProjectMembers(projectID uint64) ([]*models.ProjectMember, error) {
+	var members []*models.ProjectMember
+	if err := r.db.
+		Where("project_id = ? AND joined_at IS NOT NULL", projectID).
+		Order("joined_at ASC").
+		Find(&members).Error; err != nil {
+		return nil, err
+	}
+	return members, nil
+}
+
 func (r *MemberRepository) SaveToken(token *models.InviteToken) error {
 	return r.db.Create(token).Error
 }

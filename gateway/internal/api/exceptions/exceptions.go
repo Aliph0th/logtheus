@@ -85,9 +85,10 @@ func RespondError(ctx *gin.Context, err error) {
 	})
 }
 
-func WithBadRequest(msg string) *AppError   { return New(http.StatusBadRequest, msg) }
-func WithUnauthorized(msg string) *AppError { return New(http.StatusUnauthorized, msg) }
-func WithForbidden(msg string) *AppError    { return New(http.StatusForbidden, msg) }
-func WithNotFound(msg string) *AppError     { return New(http.StatusNotFound, msg) }
-func WithConflict(msg string) *AppError     { return New(http.StatusConflict, msg) }
-func WithInternal(msg string) *AppError     { return New(http.StatusInternalServerError, msg) }
+func WithBadRequest(msg string) *AppError    { return New(http.StatusBadRequest, msg) }
+func WithUnauthorized(msg string) *AppError  { return New(http.StatusUnauthorized, msg) }
+func WithForbidden(msg string) *AppError     { return New(http.StatusForbidden, msg) }
+func WithNotFound(msg string) *AppError      { return New(http.StatusNotFound, msg) }
+func WithConflict(msg string) *AppError      { return New(http.StatusConflict, msg) }
+func WithInternal(msg string) *AppError      { return New(http.StatusInternalServerError, msg) }
+func WithUnprocessable(msg string) *AppError { return New(http.StatusUnprocessableEntity, msg) }

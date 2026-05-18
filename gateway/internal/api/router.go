@@ -8,9 +8,14 @@ import (
 	"go.uber.org/dig"
 )
 
-func NewRouter(container *dig.Container) *gin.Engine {
+func NewRouter(container *dig.Container, origin string) *gin.Engine {
 	router := gin.Default()
-	router.Use(cors.Default())
+
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{origin}
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Authorization"}
+	router.Use(cors.New(corsConfig))
 
 	api := router.Group("/api/v1")
 	{

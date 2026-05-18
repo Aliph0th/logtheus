@@ -21,6 +21,13 @@ func NewPostgres(host string, port int, user string, password string, name strin
 		slog.Error("Failed to connect to Postgres", sl.Error(err))
 		os.Exit(1)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	if err := sqlDB.Ping(); err != nil {
+		return nil, err
+	}
 	slog.Info("Connected to Postgres database", "host", host, "port", port, "dbname", name)
 	return &Database{DB: db}, nil
 }

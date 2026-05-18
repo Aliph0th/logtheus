@@ -85,6 +85,20 @@ func (h *UserHandler) GetUser(ctx context.Context, req *userProto.GetUserRequest
 	return utils.ToUserProto(user), nil
 }
 
+func (h *UserHandler) GetUsersByIds(ctx context.Context, req *userProto.GetUsersByIdsRequest) (*userProto.GetUsersByIdsResponse, error) {
+	users, err := h.userService.GetUsersByIDs(req.UserIds)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]*userProto.User, len(users))
+	for i, user := range users {
+		items[i] = utils.ToUserProto(user)
+	}
+
+	return &userProto.GetUsersByIdsResponse{Users: items}, nil
+}
+
 func (h *UserHandler) IssueInviteToken(ctx context.Context, req *emptypb.Empty) (*userProto.InviteTokenResponse, error) {
 	token, err := h.tokenService.IssueInviteToken()
 	if err != nil {

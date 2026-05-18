@@ -112,6 +112,15 @@ func (h *ProjectHandler) GetMemberRole(ctx context.Context, req *projectProto.Ge
 	}, nil
 }
 
+func (h *ProjectHandler) GetProjectMembers(ctx context.Context, req *projectProto.GetProjectMembersRequest) (*projectProto.GetProjectMembersResponse, error) {
+	members, err := h.projectService.GetProjectMembers(ctx, req.ProjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &projectProto.GetProjectMembersResponse{Members: members}, nil
+}
+
 func (h *ProjectHandler) CreateInvite(ctx context.Context, req *projectProto.InviteUserRequest) (*projectProto.InviteUserResponse, error) {
 	err := h.invitesService.CreateInvite(ctx, req)
 	if err != nil {

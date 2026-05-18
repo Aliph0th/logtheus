@@ -22,7 +22,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	container := di.Build(cfg)
-	router := api.NewRouter(container)
+	router := api.NewRouter(container, cfg.Server.AllowOrigin)
 
 	slog.Info("Server starting", "mode", cfg.Env, "port", cfg.Server.Port)
 	if err := router.Run(fmt.Sprintf("localhost:%d", cfg.Server.Port)); err != nil {

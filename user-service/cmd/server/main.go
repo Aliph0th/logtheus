@@ -31,7 +31,10 @@ func main() {
 	defer redis.Close()
 
 	if cfg.Env == consts.DEVELOPMENT {
-		db.Migrate(&models.User{})
+		if err := db.Migrate(&models.User{}); err != nil {
+			slog.Error("Failed to migrate database", sl.Error(err))
+			os.Exit(1)
+		}
 	}
 
 	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {

@@ -7,6 +7,7 @@ import (
 	"logtheus/shared/pkg/clients"
 	applicationProto "logtheus/shared/pkg/pb/v1/application"
 	ingestionProto "logtheus/shared/pkg/pb/v1/ingestion"
+	logEngineProto "logtheus/shared/pkg/pb/v1/logengine"
 	projectProto "logtheus/shared/pkg/pb/v1/project"
 	userProto "logtheus/shared/pkg/pb/v1/user"
 
@@ -32,6 +33,9 @@ func Build(cfg *config.AppConfig) *dig.Container {
 	})
 	_ = c.Provide(func(cfg *config.AppConfig) ingestionProto.IngestionServiceClient {
 		return clients.NewIngestionClient(cfg.Services.Ingestion)
+	})
+	_ = c.Provide(func(cfg *config.AppConfig) logEngineProto.LogEngineServiceClient {
+		return clients.NewLogEngineClient(cfg.Services.LogEngine)
 	})
 
 	//Controllers

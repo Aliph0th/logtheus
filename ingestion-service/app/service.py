@@ -1,19 +1,21 @@
 # pyright: reportMissingImports=false, reportMissingModuleSource=false, reportAttributeAccessIssue=false
 import logging
+import hashlib
 from concurrent import futures
 
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.config import AppConfig
-from app.constants import MAX_INGESTION_BYTES
-from app.ingest_worker import IngestJob, IngestWorkerPool, QueueFullError
+from app.constants import MAX_INGESTION_BYTES, LogFormat, SIMILAR_REF_LOG_ID_ATTRIBUTE, SIMILAR_SCORE_ATTRIBUTE
+from app.ingest_worker import IngestJob, IngestLogPayload, IngestWorkerPool, QueueFullError, ProjectQueueFullError, PreparedLogEntry
+from app.kafka_batcher import KafkaPublishBatcher
 from app.kafka_producer import LogsKafkaProducer
-from app.parsing import detect_format, parse_attributes, now_utc
 from app.proto import application_pb2, application_pb2_grpc
 from app.proto import ingestion_pb2, ingestion_pb2_grpc
-from app.proto import logengine_pb2
-from app.utils.serialization import compact_json_dumps, to_attribute_string
+from app.proto import logengine_pb2, logengine_pb2_grpc
+from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
+from app.utils import compact_json_dumps, to_attribute_string, now_utc, detect_format, parse_json_attributes
 
 
 class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
@@ -22,6 +24,9 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
         self._app_channel = grpc.insecure_channel(cfg.application_service)
         self._app_client = application_pb2_grpc.ApplicationServiceStub(
             self._app_channel)
+        self._log_engine_channel = grpc.insecure_channel(cfg.log_engine_service)
+        self._log_engine_client = logengine_pb2_grpc.LogEngineServiceStub(
+            self._log_engine_channel)
         self._logs_producer = LogsKafkaProducer(
             brokers=cfg.kafka_brokers,
             topic=cfg.kafka_topic,
@@ -30,34 +35,53 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
             mechanism=cfg.kafka_mechanism,
             api_version=cfg.kafka_api_version,
         )
+        self._features_producer = LogsKafkaProducer(
+            brokers=cfg.kafka_brokers,
+            topic=cfg.kafka_features_topic,
+            username=cfg.kafka_username,
+            password=cfg.kafka_password,
+            mechanism=cfg.kafka_mechanism,
+            api_version=cfg.kafka_api_version,
+        )
 
-        self._extractor = None
-        if cfg.model_hf_source:
-            from app.ml_inference import LogAttributeExtractor, ensure_model_downloaded
-
-            model_path = ensure_model_downloaded(
-                model_source=cfg.model_hf_source,
-                local_dir=cfg.model_local_dir,
-                revision=cfg.model_revision,
-                token=cfg.model_hf_token,
-            )
-            self._extractor = LogAttributeExtractor(
-                model_dir=str(model_path),
-                confidence_threshold=cfg.model_confidence_threshold,
-            )
-            logging.info(
-                "ML log model enabled from %s (version=%s)",
-                model_path,
-                self._extractor.model_version,
-            )
-        else:
-            logging.info(
-                "ML log model disabled: LOG_MODEL_HF_SOURCE is not configured")
+        model_path = ensure_model_downloaded(
+            model_source=cfg.model_hf_source,
+            local_dir=cfg.model_local_dir,
+            revision=cfg.model_revision,
+            token=cfg.model_hf_token,
+        )
+        embedding_model_dir = ensure_model_downloaded(
+            model_source=cfg.embedding_model_hf_source,
+            local_dir=cfg.embedding_model_dir,
+            revision="main",
+            token=cfg.model_hf_token,
+        )
+        self._extractor = LogAttributeExtractor(
+            model_dir=str(model_path),
+            confidence_threshold=cfg.model_confidence_threshold,
+            embedding_model_dir=str(embedding_model_dir),
+            ner_batch_size=cfg.ml_ner_batch_size,
+            embedding_batch_size=cfg.ml_embedding_batch_size,
+        )
+        logging.info(
+            "ML log model enabled from %s (version=%s)",
+            model_path,
+            self._extractor.model_version,
+        )
 
         self._worker_pool = IngestWorkerPool(
             worker_count=cfg.ingest_worker_count,
             queue_size=cfg.ingest_queue_size,
+            per_project_queue_limit=cfg.ingest_per_project_queue_limit,
+            overload_high_watermark=cfg.ingest_overload_high_watermark,
             processor=self._process_job,
+        )
+        self._kafka_batcher = KafkaPublishBatcher(
+            max_logs=cfg.ingest_kafka_batch_max_logs,
+            max_bytes=cfg.ingest_kafka_batch_max_bytes,
+            max_wait_ms=cfg.ingest_kafka_batch_max_wait_ms,
+            publish_logs=self._logs_producer.publish,
+            publish_features=self._features_producer.publish,
         )
 
         logging.info(
@@ -68,7 +92,10 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
 
     def close(self) -> None:
         self._worker_pool.close()
+        self._kafka_batcher.close()
         self._logs_producer.close()
+        self._features_producer.close()
+        self._log_engine_channel.close()
         self._app_channel.close()
 
     def IngestLogs(self, request: ingestion_pb2.IngestLogRequest, context: grpc.ServicerContext) -> ingestion_pb2.IngestLogResponse:
@@ -77,16 +104,22 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                           "Batch must contain at least one log")
 
         total_size = 0
+        payloads: list[IngestLogPayload] = []
         for i, item in enumerate(request.logs):
             if not item.raw_data:
                 context.abort(grpc.StatusCode.INVALID_ARGUMENT,
                               f"logs[{i}].raw_data is required")
             total_size += len(item.raw_data)
 
-        if total_size > MAX_INGESTION_BYTES:
-            context.abort(
-                grpc.StatusCode.RESOURCE_EXHAUSTED,
-                f"Batch payload exceeds max allowed size: {MAX_INGESTION_BYTES} bytes, received: {total_size} bytes",
+            if total_size > MAX_INGESTION_BYTES:
+                context.abort(
+                    grpc.StatusCode.RESOURCE_EXHAUSTED,
+                    f"Batch payload exceeds max allowed size: {MAX_INGESTION_BYTES} bytes",
+                )
+            payloads.append(
+                IngestLogPayload(
+                    raw_data=item.raw_data,
+                )
             )
 
         try:
@@ -102,10 +135,21 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     application_name=app_info.application_name,
                     project_id=app_info.project_id,
                     source_ip=request.source_ip,
-                    raw_logs=[item.raw_data for item in request.logs],
+                    logs=payloads,
                 )
             )
+        except ProjectQueueFullError:
+            context.set_trailing_metadata(
+                (("retry-after-ms", str(self._cfg.ingest_retry_after_ms)),)
+            )
+            context.abort(
+                grpc.StatusCode.RESOURCE_EXHAUSTED,
+                "Project ingestion quota exceeded, retry later",
+            )
         except QueueFullError:
+            context.set_trailing_metadata(
+                (("retry-after-ms", str(self._cfg.ingest_retry_after_ms)),)
+            )
             context.abort(
                 grpc.StatusCode.RESOURCE_EXHAUSTED,
                 "Ingestion queue is full, retry later",
@@ -115,27 +159,111 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
 
     def _process_job(self, job: IngestJob) -> None:
         logs: list[logengine_pb2.LogItem] = []
+        features: list[logengine_pb2.LogFeatureItem] = []
 
-        for raw_data in job.raw_logs:
+        prepared: list[PreparedLogEntry] = []
+        text_indexes: list[int] = []
+        text_values: list[str] = []
+        embedding_by_prepared_index: dict[int, list[float]] = {}
+
+        for item in job.logs:
+            raw_data = item.raw_data
             fmt = detect_format(raw_data)
-            attrs, _ = parse_attributes(raw_data, fmt)
+            attrs: dict[str, str] = {}
+            embedding: list[float] = []
+            text_value = raw_data.decode("utf-8", errors="replace")
 
-            if self._extractor is not None:
-                text = raw_data.decode("utf-8", errors="replace")
-                prediction = self._extractor.predict(text)
-                ml_attrs = {
-                    key: to_attribute_string(value)
-                    for key, value in prediction.attributes.items()
-                }
-                attrs = {**attrs, **ml_attrs}
-                attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
-                if prediction.low_confidence_attributes:
-                    attrs["ml_low_confidence_attributes"] = compact_json_dumps(
-                        prediction.low_confidence_attributes,
-                    )
+            if fmt == LogFormat.FORMAT_JSON:
+                attrs = parse_json_attributes(raw_data)
+            elif fmt == LogFormat.FORMAT_TEXT:
+                text_indexes.append(len(prepared))
+                text_values.append(text_value)
 
-            ts = Timestamp()
-            ts.FromDatetime(now_utc())
+            prepared.append(
+                PreparedLogEntry(
+                    raw_data=raw_data,
+                    fmt=fmt,
+                    attrs=attrs,
+                    embedding=embedding,
+                )
+            )
+
+        if text_values:
+            embeddings = self._extractor.encode_embeddings(text_values)
+
+            similarity_matches: list[logengine_pb2.SimilarLogMatch] = []
+            try:
+                request = logengine_pb2.CheckSimilarLogsRequest(
+                    candidates=[
+                        logengine_pb2.SimilarLogCandidate(
+                            project_id=job.project_id,
+                            application_id=job.application_id,
+                            embedding=embeddings[idx],
+                        )
+                        for idx in range(len(text_indexes))
+                    ],
+                    min_similarity=self._cfg.ingest_similarity_min_score,
+                    window_days=self._cfg.ingest_similarity_window_days,
+                )
+                response = self._log_engine_client.CheckSimilarLogs(
+                    request,
+                    timeout=self._cfg.ingest_similarity_check_timeout_ms / 1000,
+                )
+                similarity_matches = list(response.matches)
+            except grpc.RpcError:
+                similarity_matches = [
+                    logengine_pb2.SimilarLogMatch(is_similar=False)
+                    for _ in text_indexes
+                ]
+
+            prediction_indexes: list[int] = []
+            prediction_texts: list[str] = []
+            for idx, prepared_index in enumerate(text_indexes):
+                if idx >= len(similarity_matches):
+                    prediction_indexes.append(prepared_index)
+                    prediction_texts.append(text_values[idx])
+                    continue
+
+                match = similarity_matches[idx]
+                if match.is_similar:
+                    prepared[prepared_index].attrs = {
+                        SIMILAR_REF_LOG_ID_ATTRIBUTE: match.matched_log_id,
+                        SIMILAR_SCORE_ATTRIBUTE: f"{match.similarity:.6f}",
+                    }
+                    prepared[prepared_index].embedding = []
+                    continue
+
+                prediction_indexes.append(prepared_index)
+                prediction_texts.append(text_values[idx])
+                embedding_by_prepared_index[prepared_index] = embeddings[idx]
+
+            if prediction_texts:
+                predictions = self._extractor.predict_batch(prediction_texts)
+
+                for idx, prepared_index in enumerate(prediction_indexes):
+                    prediction = predictions[idx]
+                    attrs = {
+                        key: to_attribute_string(value)
+                        for key, value in prediction.attributes.items()
+                    }
+                    attrs["ml_confidence"] = f"{prediction.confidence:.6f}"
+                    if prediction.low_confidence_attributes:
+                        attrs["ml_low_confidence_attributes"] = compact_json_dumps(
+                            prediction.low_confidence_attributes,
+                        )
+
+                    prepared[prepared_index].attrs = attrs
+                    prepared[prepared_index].embedding = embedding_by_prepared_index.get(prepared_index, [])
+
+        for entry in prepared:
+            raw_data = entry.raw_data
+            fmt = entry.fmt
+            attrs = entry.attrs
+            embedding = entry.embedding
+
+            now = now_utc()
+            received_at = Timestamp()
+            received_at.FromDatetime(now)
 
             logs.append(
                 logengine_pb2.LogItem(
@@ -144,20 +272,36 @@ class IngestionService(ingestion_pb2_grpc.IngestionServiceServicer):
                     project_id=job.project_id,
                     format=fmt.value,
                     source_ip=job.source_ip,
-                    received_at=ts,
+                    received_at=received_at,
                     raw_data=raw_data,
                     attributes=attrs,
                 )
             )
+            features.append(
+                logengine_pb2.LogFeatureItem(
+                    application_id=job.application_id,
+                    project_id=job.project_id,
+                    source_ip=job.source_ip,
+                    received_at=received_at,
+                    embedding=embedding,
+                    attributes=attrs,
+                    raw_data_sha256=hashlib.sha256(raw_data).hexdigest(),
+                )
+            )
 
-        payload = logengine_pb2.SaveLogsRequest(logs=logs).SerializeToString()
-        self._logs_producer.publish(payload)
+        filtered_features: list[logengine_pb2.LogFeatureItem] = []
+        for feature in features:
+            if SIMILAR_REF_LOG_ID_ATTRIBUTE in feature.attributes:
+                continue
+            filtered_features.append(feature)
+
+        self._kafka_batcher.enqueue(logs, filtered_features)
 
 
 def serve(cfg: AppConfig) -> None:
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
-    svc = IngestionService(cfg)
-    ingestion_pb2_grpc.add_IngestionServiceServicer_to_server(svc, server)
+    service = IngestionService(cfg)
+    ingestion_pb2_grpc.add_IngestionServiceServicer_to_server(service, server)
 
     server.add_insecure_port(f"[::]:{cfg.port}")
     server.start()
@@ -166,4 +310,4 @@ def serve(cfg: AppConfig) -> None:
     try:
         server.wait_for_termination()
     finally:
-        svc.close()
+        service.close()

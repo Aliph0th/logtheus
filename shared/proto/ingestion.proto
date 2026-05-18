@@ -3,8 +3,6 @@ syntax = "proto3";
 package logtheus.ingestion.v1;
 option go_package = "logtheus/shared/pkg/pb/v1/ingestion";
 
-import "google/protobuf/timestamp.proto";
-
 // Receives logs in different formats and normalizes them.
 service IngestionService {
   // Accepts a batch of logs and returns ingest status.
@@ -12,8 +10,7 @@ service IngestionService {
 }
 
 message IngestLogItem {
-  bytes                     raw_data  = 1;
-  google.protobuf.Timestamp timestamp = 2;
+  bytes raw_data = 1;
 }
 
 message IngestLogRequest {

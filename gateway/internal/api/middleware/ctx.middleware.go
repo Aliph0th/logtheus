@@ -23,7 +23,7 @@ func BindDTO[T any]() gin.HandlerFunc {
 				)
 				return
 			}
-			excepts.RespondError(ctx, excepts.WithBadRequest("Invalid request body"))
+			excepts.RespondError(ctx, excepts.WithUnprocessable("Invalid request body"))
 			return
 		}
 		ctx.Set(consts.DTO_KEY, dto)

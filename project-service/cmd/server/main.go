@@ -29,7 +29,10 @@ func main() {
 	defer db.Close()
 
 	if cfg.Env == consts.DEVELOPMENT {
-		db.Migrate(&models.Project{}, &models.ProjectMember{}, &models.InviteToken{})
+		if err := db.Migrate(&models.Project{}, &models.ProjectMember{}, &models.InviteToken{}); err != nil {
+			slog.Error("Failed to migrate database", sl.Error(err))
+			os.Exit(1)
+		}
 	}
 
 	if err := api.StartGRPCServer(cfg.Server.Port, container); err != nil {
