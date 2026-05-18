@@ -9,7 +9,7 @@ import (
 type ClusteringAssignment struct {
 	JobID     uuid.UUID     `gorm:"primaryKey;type:uuid"`
 	Job       ClusteringJob `gorm:"foreignKey:JobID;references:JobID;constraint:OnDelete:CASCADE"`
-	LogID     string        `gorm:"primaryKey;size:64;uniqueIndex:idx_clustering_assignment_job_log"`
+	LogID     string        `gorm:"primaryKey;size:64"`
 	ClusterID int32         `gorm:"not null;index"`
 	CreatedAt time.Time     `gorm:"not null"`
 }

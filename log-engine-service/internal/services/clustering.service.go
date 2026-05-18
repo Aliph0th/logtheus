@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,15 +25,28 @@ import (
 type ClusteringService struct {
 	clusteringRepo *repository.ClusteringJobRepository
 	featureRepo    *repository.LogFeatureRepository
+	logRepo        *repository.LogRepository
+	s3             *S3Service
+	logIdentity    *LogIdentityService
 	projectClient  projectProto.ProjectServiceClient
 }
 
 func NewClusteringService(
 	clusteringRepo *repository.ClusteringJobRepository,
 	featureRepo *repository.LogFeatureRepository,
+	logRepo *repository.LogRepository,
+	s3 *S3Service,
+	logIdentity *LogIdentityService,
 	projectClient projectProto.ProjectServiceClient,
 ) *ClusteringService {
-	return &ClusteringService{clusteringRepo: clusteringRepo, featureRepo: featureRepo, projectClient: projectClient}
+	return &ClusteringService{
+		clusteringRepo: clusteringRepo,
+		featureRepo:    featureRepo,
+		logRepo:        logRepo,
+		s3:             s3,
+		logIdentity:    logIdentity,
+		projectClient:  projectClient,
+	}
 }
 
 func (s *ClusteringService) StartClusteringJob(ctx context.Context, req *logEngineProto.StartClusteringJobRequest) (*logEngineProto.StartClusteringJobResponse, error) {
@@ -249,11 +263,14 @@ func (s *ClusteringService) GetClusteringJobResult(ctx context.Context, req *log
 		})
 	}
 
+	sampleTextByClusterID := s.buildClusterSampleTexts(ctx, jobID)
+
 	clusters := make([]*logEngineProto.ClusteringClusterSummaryItem, 0, len(summaries))
 	for _, summary := range summaries {
 		clusters = append(clusters, &logEngineProto.ClusteringClusterSummaryItem{
-			ClusterId: summary.ClusterID,
-			Size:      summary.Size,
+			ClusterId:  summary.ClusterID,
+			Size:       summary.Size,
+			SampleText: sampleTextByClusterID[summary.ClusterID],
 		})
 	}
 
@@ -337,9 +354,7 @@ func (s *ClusteringService) executeClusteringJob(ctx context.Context, jobID uuid
 		return
 	}
 	if truncated {
-		_ = s.clusteringRepo.MarkFailed(ctx, jobID, fmt.Sprintf("too many points for clustering, max_points=%d", job.MaxPoints), time.Now().UTC())
-		slog.Warn("Clustering dataset exceeded max_points", "job_id", jobID, "max_points", job.MaxPoints)
-		return
+		slog.Warn("Clustering dataset exceeded max_points, using truncated sample", "job_id", jobID, "max_points", job.MaxPoints)
 	}
 
 	totalPoints := uint32(len(features))
@@ -429,4 +444,80 @@ func (s *ClusteringService) executeClusteringJob(ctx context.Context, jobID uuid
 		slog.Error("Failed to save clustering result", "job_id", jobID, "error", err)
 		return
 	}
+}
+
+func (s *ClusteringService) buildClusterSampleTexts(ctx context.Context, jobID uuid.UUID) map[int32]string {
+	result := map[int32]string{}
+	representativeByClusterID, err := s.clusteringRepo.GetClusterRepresentativeLogIDs(ctx, jobID)
+	if err != nil {
+		slog.Warn("Failed to load representative log ids for cluster samples", "error", err)
+		return result
+	}
+	if len(representativeByClusterID) == 0 {
+		return result
+	}
+
+	logIDs := make([]string, 0, len(representativeByClusterID))
+	for _, logID := range representativeByClusterID {
+		logIDs = append(logIDs, logID)
+	}
+
+	records, err := s.logRepo.GetByIDs(ctx, logIDs)
+	if err != nil {
+		slog.Warn("Failed to load log records for cluster samples", "error", err)
+		return result
+	}
+
+	recordByLogID := make(map[string]repository.LogRecordLight, len(records))
+	for _, record := range records {
+		recordByLogID[record.LogID] = record
+	}
+
+	s3PayloadCache := map[string][]byte{}
+	for clusterID, logID := range representativeByClusterID {
+		record, exists := recordByLogID[logID]
+		if !exists || strings.TrimSpace(record.S3Key) == "" || record.S3Key == consts.SimilarAggregateS3Key {
+			continue
+		}
+
+		payload, exists := s3PayloadCache[record.S3Key]
+		if !exists {
+			downloaded, downloadErr := s.s3.DownloadObject(ctx, record.S3Key)
+			if downloadErr != nil {
+				slog.Warn("Failed to download sample S3 object", "s3_key", record.S3Key, "error", downloadErr)
+				continue
+			}
+			payload = downloaded
+			s3PayloadCache[record.S3Key] = payload
+		}
+
+		sampleText := s.findSampleTextByLogID(record, payload)
+		if sampleText != "" {
+			result[clusterID] = sampleText
+		}
+	}
+
+	return result
+}
+
+func (s *ClusteringService) findSampleTextByLogID(record repository.LogRecordLight, payload []byte) string {
+	lines := bytes.Split(payload, []byte("\n"))
+	for _, line := range lines {
+		candidate := strings.TrimSpace(string(line))
+		if candidate == "" {
+			continue
+		}
+
+		candidateLogID := s.logIdentity.BuildLogIDFromRawData(
+			record.ProjectID,
+			record.ApplicationID,
+			record.SourceIP,
+			[]byte(candidate),
+		)
+		if candidateLogID == record.LogID {
+			return candidate
+		}
+	}
+
+	return ""
 }

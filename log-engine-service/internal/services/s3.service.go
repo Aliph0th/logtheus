@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"logtheus/logengine/internal/config"
 	"regexp"
 	"strings"
@@ -107,6 +108,29 @@ func (s *S3Service) DeleteObject(ctx context.Context, s3Key string) error {
 		Key:    aws.String(parts[1]),
 	})
 	return err
+}
+
+func (s *S3Service) DownloadObject(ctx context.Context, s3Key string) ([]byte, error) {
+	parts := strings.SplitN(strings.TrimSpace(s3Key), "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid s3 key format")
+	}
+
+	response, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(parts[0]),
+		Key:    aws.String(parts[1]),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	payload, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
 }
 
 func mergeBatchRawData(logs []*logEngineProto.LogItem) []byte {

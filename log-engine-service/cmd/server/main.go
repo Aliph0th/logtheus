@@ -69,6 +69,13 @@ func main() {
 			os.Exit(1)
 		}
 		featuresDB.DB.Config.DisableForeignKeyConstraintWhenMigrating = false
+
+		if featuresDB.DB.Migrator().HasIndex(&models.ClusteringAssignment{}, "idx_clustering_assignment_job_log") {
+			if err := featuresDB.DB.Migrator().DropIndex(&models.ClusteringAssignment{}, "idx_clustering_assignment_job_log"); err != nil {
+				slog.Error("Failed to drop clustering assignment index", sl.Error(err))
+				os.Exit(1)
+			}
+		}
 		if !featuresDB.DB.Migrator().HasConstraint(&models.ClusteringJob{}, "Assignments") {
 			if err := featuresDB.DB.Migrator().CreateConstraint(&models.ClusteringJob{}, "Assignments"); err != nil {
 				slog.Error("Failed to create clustering assignment constraint", sl.Error(err))

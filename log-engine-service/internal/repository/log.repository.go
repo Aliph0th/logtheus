@@ -30,6 +30,14 @@ type LogRepository struct {
 	ch *storages.ClickHouse
 }
 
+type LogRecordLight struct {
+	LogID         string `gorm:"column:log_id"`
+	ProjectID     uint64 `gorm:"column:project_id"`
+	ApplicationID uint64 `gorm:"column:application_id"`
+	SourceIP      string `gorm:"column:source_ip"`
+	S3Key         string `gorm:"column:s3_key"`
+}
+
 func NewLogRepository(ch *storages.ClickHouse) *LogRepository {
 	return &LogRepository{ch: ch}
 }
@@ -74,6 +82,24 @@ func (r *LogRepository) Delete(ctx context.Context, log *models.LogRecord) error
 		return err
 	}
 	return nil
+}
+
+func (r *LogRepository) GetByIDs(ctx context.Context, logIDs []string) ([]LogRecordLight, error) {
+	if len(logIDs) == 0 {
+		return []LogRecordLight{}, nil
+	}
+
+	rows := make([]LogRecordLight, 0, len(logIDs))
+	err := r.ch.DB.WithContext(ctx).
+		Table(models.LogRecord{}.TableName()).
+		Select("log_id, project_id, application_id, toString(source_ip) AS source_ip, s3_key").
+		Where("log_id IN ?", logIDs).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }
 
 func (r *LogRepository) GetVolumeSeries(ctx context.Context, filter *logEngineProto.LogAggregationFilter, bucket logEngineProto.TimeBucket) ([]VolumePoint, error) {

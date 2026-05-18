@@ -6,6 +6,7 @@ import (
 	"logtheus/logengine/internal/consts"
 	"logtheus/logengine/internal/models"
 	"logtheus/shared/pkg/storages"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,11 @@ import (
 
 type ClusteringJobRepository struct {
 	db *gorm.DB
+}
+
+type ClusterRepresentativeRow struct {
+	ClusterID int32  `gorm:"column:cluster_id"`
+	LogID     string `gorm:"column:log_id"`
 }
 
 func NewClusteringJobRepository(db *storages.Database) *ClusteringJobRepository {
@@ -220,6 +226,32 @@ func (r *ClusteringJobRepository) GetClusterSummaries(ctx context.Context, jobID
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (r *ClusteringJobRepository) GetClusterRepresentativeLogIDs(ctx context.Context, jobID uuid.UUID) (map[int32]string, error) {
+	rows := make([]ClusterRepresentativeRow, 0)
+	err := r.db.WithContext(ctx).
+		Raw(
+			`SELECT cluster_id, MIN(log_id) AS log_id
+			 FROM clustering_assignments
+			 WHERE job_id = ? AND cluster_id >= 0
+			 GROUP BY cluster_id`,
+			jobID,
+		).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int32]string, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.LogID) == "" {
+			continue
+		}
+		result[row.ClusterID] = row.LogID
+	}
+
+	return result, nil
 }
 
 func (r *ClusteringJobRepository) PurgeExpired(ctx context.Context, now time.Time) (int64, error) {

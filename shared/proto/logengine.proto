@@ -157,6 +157,7 @@ message ClusteringAssignmentItem {
 message ClusteringClusterSummaryItem {
   int32 cluster_id = 1;
   uint32 size = 2;
+  string sample_text = 3;
 }
 
 message StartClusteringJobRequest {
